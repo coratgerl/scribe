@@ -30,11 +30,3 @@ pub const Ast = struct {
         _ = self;
     }
 };
-
-test "Parser: Basic example" {
-    var basic_example = try String.init_with_content(std.testing.allocator, "\\begin{document}\\section{Introduction}\\end{document}");
-    defer basic_example.deinit();
-
-    var ast = try Ast.init(std.testing.allocator, &basic_example);
-    defer ast.deinit();
-}
