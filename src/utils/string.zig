@@ -15,10 +15,23 @@ pub const String = struct {
         };
     }
 
-    pub fn init_with_content(allocator: std.mem.Allocator, buffer: []const u8) !String {
+    pub fn initDefaultString(allocator: std.mem.Allocator, buffer: []const u8) !String {
         var string = init(allocator);
 
         try string.concat(buffer);
+
+        return string;
+    }
+
+    pub fn initDefaultCharacter(allocator: std.mem.Allocator, buffer: u8) !String {
+        var string = init(allocator);
+
+        try string.allocate(1);
+        var tmp: [1]u8 = undefined;
+
+        std.mem.writeInt(u8, tmp[0..1], buffer, .little);
+
+        try string.insert(&tmp, 0);
 
         return string;
     }
@@ -193,7 +206,7 @@ pub const String = struct {
             var it = std.mem.splitSequence(u8, buffer, delimiter);
 
             while (it.next()) |str| {
-                const string_from_str = try String.init_with_content(self.allocator, str);
+                const string_from_str = try String.initDefaultString(self.allocator, str);
 
                 try array.append(string_from_str);
             }
@@ -211,11 +224,19 @@ pub const String = struct {
     }
 };
 
-test "String: init_with_content" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+test "String: initDefaultCharacter" {
+    var string = try String.initDefaultCharacter(std.testing.allocator, 't');
     defer string.deinit();
 
-    var string2 = try String.init_with_content(std.testing.allocator, "test,test2,test3");
+    try std.testing.expectEqual(string.len(), 1);
+    try std.testing.expect(std.mem.eql(u8, string.toString(), "t"));
+}
+
+test "String: initDefaultString" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    defer string.deinit();
+
+    var string2 = try String.initDefaultString(std.testing.allocator, "test,test2,test3");
     defer string2.deinit();
 
     try std.testing.expectEqual(string.len(), 4);
@@ -243,13 +264,13 @@ test "String: insert and concat" {
 }
 
 test "String: compare" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
-    var string2 = try String.init_with_content(std.testing.allocator, "test");
+    var string2 = try String.initDefaultString(std.testing.allocator, "test");
     defer string2.deinit();
 
-    var string3 = try String.init_with_content(std.testing.allocator, "tata");
+    var string3 = try String.initDefaultString(std.testing.allocator, "tata");
     defer string3.deinit();
 
     try std.testing.expectEqual(string.compare(string2), true);
@@ -265,7 +286,7 @@ test "String: compare" {
 }
 
 test "String: clear" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
     try string.clear();
@@ -279,7 +300,7 @@ test "String: clear" {
 }
 
 test "String: toLowerCase" {
-    var string = try String.init_with_content(std.testing.allocator, "TEST");
+    var string = try String.initDefaultString(std.testing.allocator, "TEST");
     defer string.deinit();
 
     string.toLowerCase();
@@ -288,7 +309,7 @@ test "String: toLowerCase" {
 }
 
 test "String: toUpperCase" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
     string.toUpperCase();
@@ -297,7 +318,7 @@ test "String: toUpperCase" {
 }
 
 test "String: findIndex" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
     try std.testing.expectEqual(string.findIndex("t").?, 0);
@@ -311,7 +332,7 @@ test "String: findIndex" {
 }
 
 test "String: findLastIndex" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
     try std.testing.expectEqual(string.findLastIndex("t").?, 3);
@@ -325,7 +346,7 @@ test "String: findLastIndex" {
 }
 
 test "String: replaceAll" {
-    var string = try String.init_with_content(std.testing.allocator, "test");
+    var string = try String.initDefaultString(std.testing.allocator, "test");
     defer string.deinit();
 
     try string.replaceAll("t", "a");
@@ -352,7 +373,7 @@ test "String: replaceAll" {
 }
 
 test "String: split" {
-    var string = try String.init_with_content(std.testing.allocator, "test,test2,test3");
+    var string = try String.initDefaultString(std.testing.allocator, "test,test2,test3");
     defer string.deinit();
 
     var res = try string.split(",");

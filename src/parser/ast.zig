@@ -14,7 +14,7 @@ pub const Ast = struct {
     pub fn init(allocator: std.mem.Allocator, content: *String) !Ast {
         return Ast{
             .root = Node{
-                .name = try String.init_with_content(allocator, content),
+                .name = try String.initDefaultString(allocator, content),
                 .parent = null,
                 .children = null,
             },

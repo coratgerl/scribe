@@ -36,7 +36,7 @@ pub const Lexer = struct {
 };
 
 test "Lexer - Evaluate : Basic example" {
-    var string_content = try String.init_with_content(std.testing.allocator, "\\begin{document}\\section{Introduction}\\end{document}");
+    var string_content = try String.initDefaultString(std.testing.allocator, "\\begin{document}\\section{Introduction}\\end{document}");
     defer string_content.deinit();
 
     var lexer = Lexer.init(string_content);
