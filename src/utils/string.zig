@@ -109,8 +109,16 @@ pub const String = struct {
         self.size += str.len;
     }
 
-    pub fn concat(self: *String, char: []const u8) StringError!void {
+    pub fn concat(self: *String, char: []const u8) !void {
         try self.insert(char, self.len());
+    }
+
+    pub fn concatCharacter(self: *String, char: u8) !void {
+        var tmp: [1]u8 = undefined;
+
+        std.mem.writeInt(u8, tmp[0..1], char, .little);
+
+        try self.insert(&tmp, self.len());
     }
 
     pub fn toString(self: String) []const u8 {
@@ -217,12 +225,31 @@ pub const String = struct {
         return null;
     }
 
+    pub fn clone(self: *String) !String {
+        const string = try String.initDefaultString(self.allocator, self.toString());
+
+        return string;
+    }
+
     inline fn getUTF8Size(character: u8) u3 {
         return std.unicode.utf8ByteSequenceLength(character) catch {
             return 1;
         };
     }
 };
+
+test "String: clone" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    defer string.deinit();
+
+    var string2 = try string.clone();
+    defer string2.deinit();
+
+    try std.testing.expectEqual(string.len(), 4);
+    try std.testing.expectEqual(string2.len(), 4);
+    try std.testing.expect(std.mem.eql(u8, string2.toString(), "test"));
+    try std.testing.expect(std.mem.eql(u8, string2.toString(), string.toString()));
+}
 
 test "String: initDefaultCharacter" {
     var string = try String.initDefaultCharacter(std.testing.allocator, 't');
@@ -261,6 +288,16 @@ test "String: insert and concat" {
 
     try std.testing.expectEqual(string.len(), 9);
     try std.testing.expect(std.mem.eql(u8, string.toString(), "test🚀tata"));
+}
+
+test "String: concatWithCharacter" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    defer string.deinit();
+
+    try string.concatCharacter('t');
+
+    try std.testing.expectEqual(string.len(), 5);
+    try std.testing.expect(std.mem.eql(u8, string.toString(), "testt"));
 }
 
 test "String: compare" {
