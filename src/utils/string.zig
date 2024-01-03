@@ -36,6 +36,10 @@ pub const String = struct {
         return string;
     }
 
+    pub fn deinit(self: *String) void {
+        if (self.buffer) |buffer| self.allocator.free(buffer);
+    }
+
     pub fn allocate(self: *String, bytes: usize) StringError!void {
         if (self.buffer) |buffer| {
             if (bytes < self.size)
@@ -49,10 +53,6 @@ pub const String = struct {
                 return StringError.OutOfMemory;
             };
         }
-    }
-
-    pub fn deinit(self: *String) void {
-        if (self.buffer) |buffer| self.allocator.free(buffer);
     }
 
     pub fn len(self: String) usize {
@@ -134,6 +134,12 @@ pub const String = struct {
             return std.mem.eql(u8, self.buffer.?, other.buffer.?);
 
         return false;
+    }
+
+    pub fn compareWithBuffer(self: String, buffer: []const u8) bool {
+        if (self.buffer == null) return false;
+
+        return std.mem.eql(u8, self.buffer.?, buffer);
     }
 
     pub fn clear(self: *String) !void {
@@ -237,19 +243,6 @@ pub const String = struct {
         };
     }
 };
-
-test "String: clone" {
-    var string = try String.initDefaultString(std.testing.allocator, "test");
-    defer string.deinit();
-
-    var string2 = try string.clone();
-    defer string2.deinit();
-
-    try std.testing.expectEqual(string.len(), 4);
-    try std.testing.expectEqual(string2.len(), 4);
-    try std.testing.expect(std.mem.eql(u8, string2.toString(), "test"));
-    try std.testing.expect(std.mem.eql(u8, string2.toString(), string.toString()));
-}
 
 test "String: initDefaultCharacter" {
     var string = try String.initDefaultCharacter(std.testing.allocator, 't');
@@ -428,4 +421,30 @@ test "String: split" {
 
     try std.testing.expectEqual(res2.?.items.len, 1);
     try std.testing.expect(std.mem.eql(u8, res2.?.items[0].toString(), "test,test2,test3"));
+}
+
+test "String: compareWithBuffer" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    defer string.deinit();
+
+    try std.testing.expect(string.compareWithBuffer("test"));
+    try std.testing.expect(!string.compareWithBuffer("test2"));
+
+    var string_null = String.init(std.testing.allocator);
+    defer string_null.deinit();
+
+    try std.testing.expect(!string_null.compareWithBuffer(""));
+}
+
+test "String: clone" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    defer string.deinit();
+
+    var string2 = try string.clone();
+    defer string2.deinit();
+
+    try std.testing.expectEqual(string.len(), 4);
+    try std.testing.expectEqual(string2.len(), 4);
+    try std.testing.expect(std.mem.eql(u8, string2.toString(), "test"));
+    try std.testing.expect(std.mem.eql(u8, string2.toString(), string.toString()));
 }
