@@ -2,8 +2,8 @@ const std = @import("std");
 
 const tests = struct {
     // pub usingnamespace @import("utils/string.zig");
-    pub usingnamespace @import("parser/ast.zig");
-    // pub usingnamespace @import("parser/lexer.zig");
+    // pub usingnamespace @import("parser/ast.zig");
+    pub usingnamespace @import("parser/parser.zig");
 };
 
 test {

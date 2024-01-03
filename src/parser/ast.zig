@@ -131,12 +131,12 @@ test "Node: removeChild" {
 }
 
 test "Ast: Initialize an Ast" {
-    const string = try String.initDefaultString(std.testing.allocator, "\\begin{document}\\section{Introduction}\\end{document}");
+    const string = try String.initDefaultString(std.testing.allocator, "\\documentclass{article}\\begin{document}\\section{Introduction}\\end{document}");
 
     var ast = Ast.init(std.testing.allocator, string);
     defer ast.deinit();
 
-    try std.testing.expect(ast.content.compareWithBuffer("\\begin{document}\\section{Introduction}\\end{document}"));
+    try std.testing.expect(ast.content.compareWithBuffer("\\documentclass{article}\\begin{document}\\section{Introduction}\\end{document}"));
     try std.testing.expect(ast.root.value == null);
     try std.testing.expect(ast.root.children.items.len == 0);
 }
