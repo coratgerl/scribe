@@ -8,16 +8,18 @@ pub const TokenKind = enum {
 
 pub const Node = struct {
     kind: TokenKind,
+    isRoot: bool,
     // If the node is a command, the value is the command name.
     // If the node is a string, the value is the string value.
     value: ?String,
     children: std.ArrayList(Node),
 
-    pub fn init(allocator: std.mem.Allocator, kind: TokenKind, value: ?String) !Node {
+    pub fn init(allocator: std.mem.Allocator, kind: TokenKind, value: ?String, isRoot: bool) !Node {
         const node = .{
             .kind = kind,
             .value = value,
             .children = std.ArrayList(Node).init(allocator),
+            .isRoot = isRoot,
         };
 
         return node;
@@ -46,6 +48,10 @@ pub const Node = struct {
         children.deinit();
     }
 
+    pub fn addValue(self: *Node, value: *String) void {
+        self.value = value.*;
+    }
+
     pub fn addChild(self: *Node, children: *Node) !void {
         try self.children.append(children.*);
     }
@@ -71,6 +77,7 @@ pub const Ast = struct {
                 allocator,
                 TokenKind.Command,
                 null,
+                true,
             ),
             .allocator = allocator,
             .content = content,
@@ -90,7 +97,7 @@ pub const Ast = struct {
 };
 
 test "Node: Initiliaze a Node" {
-    var node = try Node.init(std.testing.allocator, TokenKind.Command, null);
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
     defer node.deinit();
 
     try std.testing.expect(node.kind == TokenKind.Command);
@@ -98,12 +105,26 @@ test "Node: Initiliaze a Node" {
     try std.testing.expect(node.children.items.len == 0);
 }
 
+test "Node: Initialize a Node with children and sub children" {
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
+    defer node.deinit();
+
+    var child = try Node.init(std.testing.allocator, TokenKind.Command, null, false);
+    var sub_child = try Node.init(std.testing.allocator, TokenKind.Command, null, false);
+
+    try child.addChild(&sub_child);
+    try node.addChild(&child);
+
+    try std.testing.expect(node.children.items.len == 1);
+    try std.testing.expect(node.children.items[0].children.items.len == 1);
+}
+
 test "Node: addChild" {
-    var node = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test"));
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test"), true);
     defer node.deinit();
 
     // The child is deinit by the parent
-    var child = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test2"));
+    var child = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test2"), false);
 
     try node.addChild(&child);
     try std.testing.expect(node.children.items.len == 1);
@@ -113,12 +134,12 @@ test "Node: addChild" {
 }
 
 test "Node: removeChild" {
-    var node = try Node.init(std.testing.allocator, TokenKind.Command, null);
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
     defer node.deinit();
 
-    var child = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test"));
+    var child = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test"), false);
 
-    var child2 = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test2"));
+    var child2 = try Node.init(std.testing.allocator, TokenKind.Command, try String.initDefaultString(std.testing.allocator, "test2"), false);
 
     try node.addChild(&child);
     try node.addChild(&child2);
@@ -128,6 +149,17 @@ test "Node: removeChild" {
     node.removeChild(1);
     try std.testing.expect(node.children.items.len == 1);
     try std.testing.expect(node.children.items[0].value.?.compareWithBuffer("test"));
+}
+
+test "Node: addValue" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
+    defer node.deinit();
+
+    node.addValue(&string);
+
+    try std.testing.expect(node.value.?.compareWithBuffer("test"));
 }
 
 test "Ast: Initialize an Ast" {

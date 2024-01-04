@@ -231,10 +231,8 @@ pub const String = struct {
         return null;
     }
 
-    pub fn clone(self: *String) !String {
-        const string = try String.initDefaultString(self.allocator, self.toString());
-
-        return string;
+    pub fn isEmpty(self: String) bool {
+        return self.len() == 0;
     }
 
     inline fn getUTF8Size(character: u8) u3 {
@@ -436,15 +434,9 @@ test "String: compareWithBuffer" {
     try std.testing.expect(!string_null.compareWithBuffer(""));
 }
 
-test "String: clone" {
-    var string = try String.initDefaultString(std.testing.allocator, "test");
+test "String: isEmpty" {
+    var string = String.init(std.testing.allocator);
     defer string.deinit();
 
-    var string2 = try string.clone();
-    defer string2.deinit();
-
-    try std.testing.expectEqual(string.len(), 4);
-    try std.testing.expectEqual(string2.len(), 4);
-    try std.testing.expect(std.mem.eql(u8, string2.toString(), "test"));
-    try std.testing.expect(std.mem.eql(u8, string2.toString(), string.toString()));
+    try std.testing.expect(string.isEmpty());
 }

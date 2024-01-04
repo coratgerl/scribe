@@ -20,15 +20,35 @@ pub const Parser = struct {
         _ = self;
     }
 
-    fn parseCommand(self: *Parser, index_of_command: usize, node: *Node) usize {
-        _ = node;
+    pub fn parseCommand(self: *Parser, index_of_command: usize, node: *Node) !usize {
         var i: usize = index_of_command;
+
+        var previous_command_node = node;
+
+        // 1. Initialize a previous node that equal to root node
+        // 2. Add the command to the previous node (root or child node)
+        // 3. Previous node equal to child mode
 
         // We through to all the content but we will break earlier when the command is finished
         // Here typically we can use while(true) but for more secure we only trough the content
         while (i < self.content.size) {
             const character = self.content.buffer.?[i];
-            _ = character;
+
+            if (character == '\\') {
+                var command_name = try self.getCommandName(i + 1);
+
+                var child_node = try Node.init(self.allocator, TokenKind.Command, null, false);
+                child_node.addValue(&command_name);
+
+                try previous_command_node.addChild(&child_node);
+
+                std.debug.print("Command name : {s}\n", .{command_name.toString()});
+                std.debug.print("Is root node : {any}\n", .{previous_command_node.isRootg});
+
+                previous_command_node = &child_node;
+
+                // i += command_name.len();
+            }
 
             i += 1;
         }
@@ -41,30 +61,17 @@ pub const Parser = struct {
 
         var string = String.init(self.allocator);
 
-        var first_bracket_encountered = false;
-
         while (i < self.content.size) {
             const character = self.content.buffer.?[i];
 
             if (character == '{') {
-                first_bracket_encountered = true;
-                i += 1;
-                continue;
-            }
-
-            if (character == '}' and first_bracket_encountered) {
                 break;
             }
 
-            if (first_bracket_encountered) {
-                try string.concatCharacter(character);
-            }
+            try string.concatCharacter(character);
 
             i += 1;
         }
-
-        if (!first_bracket_encountered)
-            unreachable;
 
         return string;
     }
@@ -88,6 +95,7 @@ pub const Parser = struct {
 
             if (c == '\\') {
                 var node = Node.init(self.allocator, Node.Kind.Command);
+                // Memory leak
                 self.root.addChild(&node);
 
                 self.parseCommand(i + 1, &node);
@@ -98,23 +106,47 @@ pub const Parser = struct {
     }
 };
 
-test "Parser: parse (Basic example)" {
+test "Parser: parseCommand" {
     // \documentclass{article}
     // \begin{document}
     // \section{Introduction}
     // This is a simple document.
     // \end{document}
+
+    var string = try String.initDefaultString(std.testing.allocator, "\\textbf{\\textbf{Hello}}");
+    defer string.deinit();
+
+    var root_node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
+    defer root_node.deinit();
+
+    var parser = Parser.init(std.testing.allocator, &string, &root_node);
+
+    _ = try parser.parseCommand(0, &root_node);
+
+    if (root_node.children.items[0].value) |value| {
+        std.debug.print("Node value : {s}\n", .{value.toString()});
+
+        // if (root_node.children.items[0].children.items[0].value) |value2| {
+        //     std.debug.print("Sub node value : {s}\n", .{value2.toString()});
+        // }
+    }
 }
 
 test "Parser: getCommandName" {
     var string = try String.initDefaultString(std.testing.allocator, "\\begin{document}");
     defer string.deinit();
 
-    var node = try Node.init(std.testing.allocator, TokenKind.Command, null);
+    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
+    defer node.deinit();
 
     var parser = Parser.init(std.testing.allocator, &string, &node);
     var command_name = try parser.getCommandName(1);
     defer command_name.deinit();
 
-    try std.testing.expect(command_name.compareWithBuffer("document"));
+    try std.testing.expect(command_name.compareWithBuffer("begin"));
+
+    var command_name_not_exist = try parser.getCommandName(100);
+    defer command_name_not_exist.deinit();
+
+    try std.testing.expect(command_name_not_exist.isEmpty());
 }
