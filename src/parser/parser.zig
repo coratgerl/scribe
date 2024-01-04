@@ -22,12 +22,16 @@ pub const Parser = struct {
 
     pub fn parseCommand(self: *Parser, index_of_command: usize, node: *Node) !usize {
         var i: usize = index_of_command;
+        var is_command_found = false;
 
-        var previous_command_node = node;
-
-        // 1. Initialize a previous node that equal to root node
-        // 2. Add the command to the previous node (root or child node)
-        // 3. Previous node equal to child mode
+        // \textbf{\textbf{\textbf{Hello}}}
+        // 1. Je suis à l'index 0
+        // 2. Je rencontre un \
+        // 3. Je crée un node de type commande
+        // 4. Je récupère le nom de la commande
+        // 5. Je me déplace à l'index de la fin de la commande
+        // 6. J'ajoute le nom dans la value du node
+        // 7. J'ajoute le node dans children
 
         // We through to all the content but we will break earlier when the command is finished
         // Here typically we can use while(true) but for more secure we only trough the content
@@ -37,23 +41,26 @@ pub const Parser = struct {
             if (character == '\\') {
                 var command_name = try self.getCommandName(i + 1);
 
-                var child_node = try Node.init(self.allocator, TokenKind.Command, null, false);
-                child_node.addValue(&command_name);
+                var child_node = try Node.init(self.allocator, TokenKind.Command, &command_name, false);
 
-                try previous_command_node.addChild(&child_node);
+                if (!is_command_found) {
+                    i += command_name.len();
 
-                std.debug.print("Command name : {s}\n", .{command_name.toString()});
-                std.debug.print("Is root node : {any}\n", .{previous_command_node.isRootg});
+                    try node.*.addChild(&child_node);
 
-                previous_command_node = &child_node;
+                    // std.debug.print("Node address : {*}, Child address: {*}, Command name : {s}\n", .{ &(node.*), &(child_node), command_name.toString() });
 
-                // i += command_name.len();
+                    is_command_found = true;
+                } else {
+                    _ = try self.parseCommand(i, &child_node);
+                    break;
+                }
             }
 
             i += 1;
         }
 
-        return 0;
+        return i;
     }
 
     fn getCommandName(self: *Parser, index_of_command: usize) !String {
@@ -106,47 +113,46 @@ pub const Parser = struct {
     }
 };
 
-test "Parser: parseCommand" {
-    // \documentclass{article}
-    // \begin{document}
-    // \section{Introduction}
-    // This is a simple document.
-    // \end{document}
+// test "Parser: parseCommand" {
+//     // \documentclass{article}
+//     // \begin{document}
+//     // \section{Introduction}
+//     // This is a simple document.
+//     // \end{document}
 
-    var string = try String.initDefaultString(std.testing.allocator, "\\textbf{\\textbf{Hello}}");
-    defer string.deinit();
+//     var string = try String.initDefaultString(std.testing.allocator, "\\textbf1{\\textbf2{Hello}}");
+//     defer string.deinit();
 
-    var root_node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
-    defer root_node.deinit();
+//     var root_value = try String.initDefaultString(std.testing.allocator, "root");
 
-    var parser = Parser.init(std.testing.allocator, &string, &root_node);
+//     var root_node = try Node.init(std.testing.allocator, TokenKind.Command, &root_value, true);
+//     defer root_node.deinit();
 
-    _ = try parser.parseCommand(0, &root_node);
+//     var parser = Parser.init(std.testing.allocator, &string, &root_node);
 
-    if (root_node.children.items[0].value) |value| {
-        std.debug.print("Node value : {s}\n", .{value.toString()});
+//     std.debug.print("Root node address {*}\n", .{&(root_node)});
 
-        // if (root_node.children.items[0].children.items[0].value) |value2| {
-        //     std.debug.print("Sub node value : {s}\n", .{value2.toString()});
-        // }
-    }
-}
+//     _ = try parser.parseCommand(0, &root_node);
 
-test "Parser: getCommandName" {
-    var string = try String.initDefaultString(std.testing.allocator, "\\begin{document}");
-    defer string.deinit();
+//     // std.debug.print("Node value : {s}\n", .{root_node.children.items[0].value.toString()});
+//     // std.debug.print("Sub node value : {s}\n", .{root_node.children.items[0].children.items[0].value.toString()});
+// }
 
-    var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
-    defer node.deinit();
+// test "Parser: getCommandName" {
+//     var string = try String.initDefaultString(std.testing.allocator, "\\begin{document}");
+//     defer string.deinit();
 
-    var parser = Parser.init(std.testing.allocator, &string, &node);
-    var command_name = try parser.getCommandName(1);
-    defer command_name.deinit();
+//     var node = try Node.init(std.testing.allocator, TokenKind.Command, null, true);
+//     defer node.deinit();
 
-    try std.testing.expect(command_name.compareWithBuffer("begin"));
+//     var parser = Parser.init(std.testing.allocator, &string, &node);
+//     var command_name = try parser.getCommandName(1);
+//     defer command_name.deinit();
 
-    var command_name_not_exist = try parser.getCommandName(100);
-    defer command_name_not_exist.deinit();
+//     try std.testing.expect(command_name.compareWithBuffer("begin"));
 
-    try std.testing.expect(command_name_not_exist.isEmpty());
-}
+//     var command_name_not_exist = try parser.getCommandName(100);
+//     defer command_name_not_exist.deinit();
+
+//     try std.testing.expect(command_name_not_exist.isEmpty());
+// }

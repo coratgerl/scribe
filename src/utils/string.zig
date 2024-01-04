@@ -37,7 +37,10 @@ pub const String = struct {
     }
 
     pub fn deinit(self: *String) void {
-        if (self.buffer) |buffer| self.allocator.free(buffer);
+        if (self.buffer) |buffer| {
+            self.allocator.free(buffer);
+            self.size = 0;
+        }
     }
 
     pub fn allocate(self: *String, bytes: usize) StringError!void {
@@ -264,6 +267,13 @@ test "String: initDefaultString" {
     try std.testing.expectEqual(string2.len(), 16);
     try std.testing.expectEqual(string2.buffer.?.len, string2.len());
     try std.testing.expect(std.mem.eql(u8, string2.toString(), "test,test2,test3"));
+}
+
+test "String: deinit" {
+    var string = try String.initDefaultString(std.testing.allocator, "test");
+    string.deinit();
+
+    try std.testing.expect(string.size == 0);
 }
 
 test "String: insert and concat" {
