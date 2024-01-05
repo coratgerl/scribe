@@ -11,16 +11,21 @@ pub const Token = struct {
 
     pub const keywords = std.ComptimeStringMap(Tag, .{
         .{ "begin", .command_begin },
+        .{ "end", .command_end },
         .{ "textbf", .command_textbf },
+        .{ "section", .command_section },
     });
 
     pub const Tag = enum {
         string_literal,
         command_begin,
+        command_end,
         command_textbf,
+        command_section,
         backslash,
         left_brace,
         right_brace,
+        line_break,
         eof,
     };
 };
@@ -83,14 +88,15 @@ pub const Tokenizer = struct {
 
                         break;
                     },
-                    'a'...'z', 'A'...'Z' => {
+                    '\n' => {},
+                    'a'...'z', 'A'...'Z', ' ' => {
                         result.tag = .string_literal;
                         state = .string_literal;
                     },
                     else => {},
                 },
                 .string_literal => switch (c) {
-                    'a'...'z', 'A'...'Z' => {},
+                    'a'...'z', 'A'...'Z', ' ' => {},
                     else => {
                         if (Token.keywords.get(self.source[result.loc.start..self.index])) |tag| {
                             result.tag = tag;
@@ -136,11 +142,43 @@ test "Tokenizer: recursive textbf" {
     });
 }
 
+test "Tokenizer: begin" {
+    try testTokenize("\\begin{document}", &.{
+        .backslash,
+        .command_begin,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .eof,
+    });
+}
+
+test "Tokenizer: test with content in section" {
+    try testTokenize("\\begin{document}\n\\section{Introduction}\nContent of the introduction\n\\end{document}", &.{
+        .backslash,
+        .command_begin,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .backslash,
+        .command_section,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .string_literal,
+        .backslash,
+        .command_end,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .eof,
+    });
+}
+
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
     var tokenizer = Tokenizer.init(source);
     for (expected_token_tags) |expected_token_tag| {
         const token = tokenizer.next();
-        std.debug.print("token: {any}\n", .{token.tag});
         try std.testing.expectEqual(expected_token_tag, token.tag);
     }
 }
