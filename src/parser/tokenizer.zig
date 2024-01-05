@@ -153,7 +153,7 @@ test "Tokenizer: begin" {
     });
 }
 
-test "Tokenizer: test with content in section" {
+test "Tokenizer: test with content in section and line break" {
     try testTokenize("\\begin{document}\n\\section{Introduction}\nContent of the introduction\n\\end{document}", &.{
         .backslash,
         .command_begin,
