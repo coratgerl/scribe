@@ -8,7 +8,7 @@ const Tokenizer = token_file.Tokenizer;
 
 pub const Node = struct {
     parent_index: usize,
-    tag: Token.Tag,
+    kind: Token.TokenKind,
     start: usize,
     end: usize,
     // TODO : For search optimization we will need to get the an array of children index
@@ -26,6 +26,15 @@ pub const Ast = struct {
     });
 
     pub const NodeList = std.MultiArrayList(Node);
+
+    pub const Error = struct {
+        tag: Tag,
+        token_index: usize,
+
+        pub const Tag = enum {
+            missing_backslash_before_command,
+        };
+    };
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) !Ast {
         var tokens = Ast.TokenList{};
