@@ -28,6 +28,15 @@ pub const Token = struct {
         line_break,
         eof,
     };
+
+    pub const TokenType = enum {
+        command,
+        string_literal,
+        backslash,
+        left_brace,
+        right_brace,
+        invalid,
+    };
 };
 
 pub const Tokenizer = struct {
@@ -174,6 +183,8 @@ test "Tokenizer: test with content in section and line break" {
         .eof,
     });
 }
+
+// TODO: Create test for this use case \textbf{textbf}
 
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
     var tokenizer = Tokenizer.init(source);

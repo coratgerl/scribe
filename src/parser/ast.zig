@@ -7,19 +7,17 @@ const Token = token_file.Token;
 const Tokenizer = token_file.Tokenizer;
 
 pub const Node = struct {
+    parent_index: usize,
     tag: Token.Tag,
     start: usize,
-    expr: Expression,
-
-    pub const Expression = struct {
-        start: usize,
-        end: usize,
-    };
+    end: usize,
+    // TODO : For search optimization we will need to get the an array of children index
 };
 
 pub const Ast = struct {
     source: []const u8,
     tokens: TokenList.Slice,
+    nodes: NodeList.Slice,
     allocator: std.mem.Allocator,
 
     pub const TokenList = std.MultiArrayList(struct {
@@ -49,7 +47,7 @@ pub const Ast = struct {
                 break;
         }
 
-        const parser = Parser.init(allocator, tokens.items(.tag), source);
+        const parser = Parser.init(allocator, tokens.items(.tag), source, .{});
         _ = parser;
 
         return .{
