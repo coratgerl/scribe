@@ -32,6 +32,8 @@ pub const Ast = struct {
         token_index: usize,
 
         pub const Tag = enum {
+            missing_right_brace,
+            missing_left_brace,
             missing_backslash_before_command,
         };
     };

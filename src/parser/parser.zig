@@ -1,8 +1,10 @@
 const std = @import("std");
 
-const Ast = @import("./ast.zig").Ast;
-const NodeList = Ast.NodeList;
-const TokenList = Ast.TokenList;
+const ast_file = @import("./ast.zig");
+const Node = ast_file.Node;
+const AstError = ast_file.Ast.Error;
+const NodeList = ast_file.Ast.NodeList;
+const TokenList = ast_file.Ast.TokenList;
 
 const token_file = @import("./tokenizer.zig");
 const Token = token_file.Token;
@@ -14,12 +16,7 @@ pub const Parser = struct {
     index: usize,
     allocator: std.mem.Allocator,
     nodes: NodeList,
-    errors: std.ArrayListUnmanaged(Ast.Error),
-
-    pub const ParserError = error{
-        MissingBackslashBeforeCommand,
-        OutOfMemory,
-    };
+    errors: std.MultiArrayList(AstError),
 
     pub fn init(allocator: std.mem.Allocator, tokens: []Token.Tag, source: []const u8, nodes: NodeList) Parser {
         return Parser{
@@ -37,15 +34,25 @@ pub const Parser = struct {
         self.errors.deinit(self.allocator);
     }
 
-    pub fn parseRoot(self: *Parser) ParserError!void {
-        // TODO : Append root
+    pub fn parseRoot(self: *Parser) !void {
+        try self.nodes.append(self.allocator, .{
+            .parent_index = 0,
+            .kind = .root,
+            .start = 0,
+            .end = 0,
+        });
+
         try self.parseBlock();
     }
 
     // A block is the content of { }
     // For example in \textbf{Hello}, the content block is Hello
-    pub fn parseBlock(self: *Parser) ParserError!void {
+    pub fn parseBlock(self: *Parser) !void {
         var block_state: Token.TokenKind = .invalid;
+
+        var left_brace_count: usize = 0;
+        var right_brace_count: usize = 0;
+        var parent_index: usize = 0;
 
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
@@ -54,16 +61,27 @@ pub const Parser = struct {
                 .backslash => {
                     block_state = .command;
                 },
+                .left_brace => {
+                    left_brace_count += 1;
+                },
+                .right_brace => {
+                    // A block is finished when the number of left brace is equal to the number of right brace
+                    // For example \textbf{\textbf{\textbf{Hello}}}
+                    if (left_brace_count == right_brace_count) {
+                        break;
+                    }
+                    right_brace_count += 1;
+                },
                 .command_textbf => switch (block_state) {
                     .command => {
                         try self.nodes.append(self.allocator, .{
-                            .parent_index = 0,
+                            .parent_index = parent_index,
                             .kind = .command,
                             .start = self.index,
                             .end = self.index,
                         });
 
-                        std.debug.print("On est dans le textbf\n", .{});
+                        parent_index = self.nodes.len - 1;
                     },
                     else => {
                         try self.errors.append(self.allocator, .{
@@ -71,50 +89,129 @@ pub const Parser = struct {
                             .token_index = self.index,
                         });
 
-                        return ParserError.MissingBackslashBeforeCommand;
+                        // TODO : Handle error ?
                     },
                 },
                 .string_literal => switch (block_state) {
                     .command => {
-                        std.debug.print("On est dans le Hello\n", .{});
+                        try self.nodes.append(self.allocator, .{
+                            .parent_index = parent_index,
+                            .kind = .string_literal,
+                            .start = self.index,
+                            .end = self.index,
+                        });
                     },
                     else => {},
                 },
                 else => {},
             }
         }
+
+        if (left_brace_count != right_brace_count) {
+            if (left_brace_count > right_brace_count) {
+                try self.errors.append(self.allocator, .{
+                    .tag = .missing_right_brace,
+                    .token_index = self.index,
+                });
+            } else {
+                try self.errors.append(self.allocator, .{
+                    .tag = .missing_left_brace,
+                    .token_index = self.index,
+                });
+            }
+        }
     }
 };
 
-test "Parser: textbf" {
-    // \textbf{Hello}
-    // Result : [
-    //    Node: {
-    //        parent_index : -1,
-    //        type: .root,
-    //        start: 0,
-    //        end: 0,
-    //    },
-    //    Node: {
-    //        parent_index : 0,
-    //        type: .command,
-    //        start: 0,
-    //        end: 13,
-    //    },
-    //    Node: {
-    //        parent_index : 1,
-    //        type: .string_litteral,
-    //        start: 9,
-    //        end: 13,
-    //    },
-    // ]
+// Example of valid structure:
+// \textbf{Hello}
+// Result : [
+//    Node: {
+//        parent_index : 0,
+//        type: .root,
+//        start: 0,
+//        end: 0,
+//    },
+//    Node: {
+//        parent_index : 0,
+//        type: .command,
+//        start: 0,
+//        end: 13,
+//    },
+//    Node: {
+//        parent_index : 1,
+//        type: .string_litteral,
+//        start: 9,
+//        end: 13,
+//    },
+// ]
 
+test "Parser: textbf" {
     const source = "\\textbf{Hello}";
-    const tata = try testParser(source);
-    _ = tata;
+    try testParser(source, &.{
+        .root,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
 }
 
-fn testParser(source: []const u8) !void {
+test "Parser: recursive textbf" {
+    const source = "\\textbf{\\textbf{Hello}}";
+    try testParser(source, &.{
+        .root,
+        .command,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+    }, &.{});
+}
+
+test "Parser: double recursive textbf" {
+    const source = "\\textbf{\\textbf{\\textbf{Hello}}}";
+    try testParser(source, &.{
+        .root,
+        .command,
+        .command,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
+    }, &.{});
+}
+
+test "Parser: missing one right brace" {
+    const source = "\\textbf{\\textbf{\\textbf{Hello}}";
+
+    try testParser(source, &.{
+        .root,
+        .command,
+        .command,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
+    }, &.{
+        .missing_right_brace,
+    });
+}
+
+fn testParser(source: []const u8, expected_tokens_kinds: []const Token.TokenKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
     var tokens = TokenList{};
     defer tokens.deinit(std.testing.allocator);
 
@@ -137,4 +234,29 @@ fn testParser(source: []const u8) !void {
     defer parser.deinit();
 
     try parser.parseRoot();
+
+    const slice = parser.nodes.slice();
+
+    const errors_slice = parser.errors.slice();
+
+    var i: usize = 0;
+    for (expected_tokens_kinds) |expected_token_kind| {
+        try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
+
+        i += 1;
+    }
+
+    i = 0;
+    for (parent_index) |index| {
+        try std.testing.expectEqual(index, slice.get(i).parent_index);
+
+        i += 1;
+    }
+
+    i = 0;
+    for (errors) |error_tag| {
+        try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
+
+        i += 1;
+    }
 }

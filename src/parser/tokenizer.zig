@@ -30,6 +30,7 @@ pub const Token = struct {
     };
 
     pub const TokenKind = enum {
+        root,
         command,
         string_literal,
         backslash,
