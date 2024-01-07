@@ -28,16 +28,6 @@ pub const Token = struct {
         line_break,
         eof,
     };
-
-    pub const TokenKind = enum {
-        root,
-        command,
-        string_literal,
-        backslash,
-        left_brace,
-        right_brace,
-        invalid,
-    };
 };
 
 pub const Tokenizer = struct {

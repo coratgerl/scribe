@@ -8,10 +8,16 @@ const Tokenizer = token_file.Tokenizer;
 
 pub const Node = struct {
     parent_index: usize,
-    kind: Token.TokenKind,
+    kind: NodeKind,
     start: usize,
     end: usize,
     // TODO : For search optimization we will need to get the an array of children index
+
+    pub const NodeKind = enum {
+        root,
+        command,
+        string_literal,
+    };
 };
 
 pub const Ast = struct {

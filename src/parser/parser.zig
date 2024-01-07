@@ -18,6 +18,12 @@ pub const Parser = struct {
     nodes: NodeList,
     errors: std.MultiArrayList(AstError),
 
+    pub const ParserState = enum {
+        invalid, // Default state
+        backslash_command, // \ is encountered
+        valid_command, // \ is encountered and {
+    };
+
     pub fn init(allocator: std.mem.Allocator, tokens: []Token.Tag, source: []const u8, nodes: NodeList) Parser {
         return Parser{
             .tokens = tokens,
@@ -48,7 +54,7 @@ pub const Parser = struct {
     // A block is the content of { }
     // For example in \textbf{Hello}, the content block is Hello
     pub fn parseBlock(self: *Parser) !void {
-        var block_state: Token.TokenKind = .invalid;
+        var block_state: ParserState = .invalid;
 
         var left_brace_count: usize = 0;
         var right_brace_count: usize = 0;
@@ -59,21 +65,26 @@ pub const Parser = struct {
 
             switch (token) {
                 .backslash => {
-                    block_state = .command;
+                    block_state = .backslash_command;
                 },
-                .left_brace => {
-                    left_brace_count += 1;
+                .left_brace => switch (block_state) {
+                    .backslash_command => {
+                        block_state = .valid_command;
+                        left_brace_count += 1;
+                    },
+                    else => {
+                        left_brace_count += 1;
+                    },
                 },
                 .right_brace => {
                     // A block is finished when the number of left brace is equal to the number of right brace
                     // For example \textbf{\textbf{\textbf{Hello}}}
-                    if (left_brace_count == right_brace_count) {
-                        break;
-                    }
+                    if (left_brace_count == right_brace_count) break;
+
                     right_brace_count += 1;
                 },
                 .command_textbf => switch (block_state) {
-                    .command => {
+                    .backslash_command => {
                         try self.nodes.append(self.allocator, .{
                             .parent_index = parent_index,
                             .kind = .command,
@@ -93,12 +104,18 @@ pub const Parser = struct {
                     },
                 },
                 .string_literal => switch (block_state) {
-                    .command => {
+                    .valid_command => {
                         try self.nodes.append(self.allocator, .{
                             .parent_index = parent_index,
                             .kind = .string_literal,
                             .start = self.index,
                             .end = self.index,
+                        });
+                    },
+                    .backslash_command => {
+                        try self.errors.append(self.allocator, .{
+                            .tag = .missing_left_brace,
+                            .token_index = self.index,
                         });
                     },
                     else => {},
@@ -211,7 +228,23 @@ test "Parser: missing one right brace" {
     });
 }
 
-fn testParser(source: []const u8, expected_tokens_kinds: []const Token.TokenKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
+test "Parser: missing one left brace" {
+    const source = "\\textbf{\\textbf{\\textbfHello}}}";
+
+    try testParser(source, &.{
+        .root,
+        .command,
+        .command,
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{
+        .missing_left_brace,
+    });
+}
+
+fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
     var tokens = TokenList{};
     defer tokens.deinit(std.testing.allocator);
 
