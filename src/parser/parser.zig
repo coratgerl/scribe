@@ -63,6 +63,8 @@ pub const Parser = struct {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
 
+            // std.debug.print("token: {any}\n", .{token});
+
             switch (token) {
                 .backslash => {
                     block_state = .backslash_command;
@@ -77,10 +79,6 @@ pub const Parser = struct {
                     },
                 },
                 .right_brace => {
-                    // A block is finished when the number of left brace is equal to the number of right brace
-                    // For example \textbf{\textbf{\textbf{Hello}}}
-                    if (left_brace_count == right_brace_count) break;
-
                     right_brace_count += 1;
                 },
                 .command_textbf => switch (block_state) {
@@ -91,6 +89,8 @@ pub const Parser = struct {
                             .start = self.index,
                             .end = self.index,
                         });
+
+                        // std.debug.print("Command: {any}\n", .{token});
 
                         parent_index = self.nodes.len - 1;
                     },
@@ -239,6 +239,42 @@ test "Parser: missing one left brace" {
         0,
         0,
         1,
+    }, &.{
+        .missing_left_brace,
+    });
+
+    const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
+
+    try testParser(source2, &.{
+        .root,
+        .command,
+        .command,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
+    }, &.{
+        .missing_left_brace,
+    });
+
+    const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
+
+    try testParser(source3, &.{
+        .root,
+        .command,
+        .command,
+        .command,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
     }, &.{
         .missing_left_brace,
     });
