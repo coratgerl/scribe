@@ -14,18 +14,23 @@ pub const Token = struct {
         .{ "end", .command_end },
         .{ "textbf", .command_textbf },
         .{ "section", .command_section },
+        .{ "usepackage", .command_usepackage },
     });
 
     pub const Tag = enum {
         string_literal,
         command_begin,
         command_end,
+        command_usepackage,
         command_textbf,
         command_section,
         backslash,
         left_brace,
         right_brace,
+        left_bracket,
+        right_bracket,
         line_break,
+        comma,
         eof,
     };
 };
@@ -33,17 +38,48 @@ pub const Token = struct {
 pub const Tokenizer = struct {
     source: []const u8,
     index: usize,
+    allocator: std.mem.Allocator,
 
     pub const State = enum {
         start,
         string_literal,
     };
 
-    pub fn init(source: []const u8) Tokenizer {
+    pub const TokenList = std.MultiArrayList(struct {
+        tag: Token.Tag,
+        start: usize,
+    });
+
+    pub fn init(source: []const u8, allocator: std.mem.Allocator) Tokenizer {
         return Tokenizer{
             .source = source,
             .index = 0,
+            .allocator = allocator,
         };
+    }
+
+    pub fn tokenize(self: *Tokenizer) !TokenList {
+        var tokens = TokenList{};
+
+        // TODO : We will need to estimated the ratio of token in latex
+        try tokens.ensureTotalCapacity(self.allocator, self.source.len);
+
+        var i: usize = 0;
+        while (true) {
+            const token = self.next();
+
+            try tokens.append(self.allocator, .{
+                .tag = token.tag,
+                .start = token.loc.start,
+            });
+
+            if (token.tag == .eof)
+                break;
+
+            i += 1;
+        }
+
+        return tokens;
     }
 
     pub fn next(self: *Tokenizer) Token {
@@ -71,6 +107,24 @@ pub const Tokenizer = struct {
 
                         break;
                     },
+                    '[' => {
+                        result.tag = .left_bracket;
+                        result.loc.start = self.index;
+                        result.loc.end = self.index;
+
+                        self.index += 1;
+
+                        break;
+                    },
+                    ']' => {
+                        result.tag = .right_bracket;
+                        result.loc.start = self.index;
+                        result.loc.end = self.index;
+
+                        self.index += 1;
+
+                        break;
+                    },
                     '{' => {
                         result.tag = .left_brace;
                         result.loc.start = self.index;
@@ -88,11 +142,19 @@ pub const Tokenizer = struct {
 
                         break;
                     },
-                    '\n' => {},
+                    ',' => {
+                        result.tag = .comma;
+                        result.loc.start = self.index;
+                        result.loc.end = self.index;
+
+                        self.index += 1;
+                        break;
+                    },
                     'a'...'z', 'A'...'Z', ' ' => {
                         result.tag = .string_literal;
                         state = .string_literal;
                     },
+                    '\n' => {},
                     else => {},
                 },
                 .string_literal => switch (c) {
@@ -115,6 +177,53 @@ pub const Tokenizer = struct {
         return result;
     }
 };
+
+test "Tokenizer: begin document" {
+    try testTokenize("\\begin{document}\\textbf{Hello}This is a valid content\\end{document}", &.{
+        .backslash,
+        .command_begin,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .backslash,
+        .command_textbf,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .string_literal,
+        .backslash,
+        .command_end,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .eof,
+    });
+}
+
+test "Tokenizer: command with multiple arguments" {
+    try testTokenize("\\textbf{argument1, argument2}", &.{
+        .backslash,
+        .command_textbf,
+        .left_brace,
+        .string_literal,
+        .comma,
+        .string_literal,
+        .right_brace,
+        .eof,
+    });
+
+    try testTokenize("\\usepackage[utf8]{inputenc}", &.{
+        .backslash,
+        .command_usepackage,
+        .left_bracket,
+        .string_literal,
+        .right_bracket,
+        .left_brace,
+        .string_literal,
+        .right_brace,
+        .eof,
+    });
+}
 
 test "Tokenizer: simple textbf" {
     try testTokenize("\\textbf{Hello}", &.{
@@ -178,9 +287,14 @@ test "Tokenizer: test with content in section and line break" {
 // TODO: Create test for this use case \textbf{textbf}
 
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
-    var tokenizer = Tokenizer.init(source);
+    var tokenizer = Tokenizer.init(source, std.testing.allocator);
+    var tokens = try tokenizer.tokenize();
+    defer tokens.deinit(std.testing.allocator);
+
+    var i: usize = 0;
     for (expected_token_tags) |expected_token_tag| {
-        const token = tokenizer.next();
-        try std.testing.expectEqual(expected_token_tag, token.tag);
+        try std.testing.expectEqual(expected_token_tag, tokens.get(i).tag);
+
+        i += 1;
     }
 }

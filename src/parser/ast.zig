@@ -45,24 +45,9 @@ pub const Ast = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, source: []const u8) !Ast {
-        var tokens = Ast.TokenList{};
-        defer tokens.deinit(allocator);
-
-        // TODO : We will need to estimated the ratio of token in latex
-        try tokens.ensureTotalCapacity(allocator, source.len);
-
-        var tokenizer = Tokenizer.init(source);
-
-        while (true) {
-            const token = tokenizer.next();
-            try tokens.append(allocator, .{
-                .tag = token.tag,
-                .start = token.loc.start,
-            });
-
-            if (token.tag == .eof)
-                break;
-        }
+        var tokenizer = Tokenizer.init(source, std.testing.allocator);
+        var tokens = try tokenizer.tokenize();
+        defer tokens.deinit(std.testing.allocator);
 
         const parser = Parser.init(allocator, tokens.items(.tag), source, .{});
         _ = parser;

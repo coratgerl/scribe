@@ -141,7 +141,9 @@ pub const Parser = struct {
 };
 
 // Example of valid structure:
+// \begin{document}
 // \textbf{Hello}
+// \end{document}
 // Result : [
 //    Node: {
 //        parent_index : 0,
@@ -153,15 +155,41 @@ pub const Parser = struct {
 //        parent_index : 0,
 //        type: .command,
 //        start: 0,
-//        end: 13,
+//        end: 44,
 //    },
 //    Node: {
 //        parent_index : 1,
 //        type: .string_litteral,
-//        start: 9,
-//        end: 13,
+//        start: 7,
+//        end: 15,
+//    },
+//    Node: {
+//        parent_index : 1,
+//        type: .command,
+//        start: 16,
+//        end: 22,
+//    },
+//    Node: {
+//        parent_index : 3,
+//        type: .string_litteral,
+//        start: 23,
+//        end: 28,
+//    },
+//    Node: {
+//        parent_index : 0,
+//        type: .command,
+//        start: 29,
+//        end: 32,
+//    },
+//    Node: {
+//        parent_index : 0,
+//        type: .string_literal,
+//        start: 29,
+//        end: 40,
 //    },
 // ]
+
+test "Parser: begin document" {}
 
 test "Parser: textbf" {
     const source = "\\textbf{Hello}";
@@ -281,23 +309,9 @@ test "Parser: missing one left brace" {
 }
 
 fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
-    var tokens = TokenList{};
+    var tokenizer = Tokenizer.init(source, std.testing.allocator);
+    var tokens = try tokenizer.tokenize();
     defer tokens.deinit(std.testing.allocator);
-
-    try tokens.ensureTotalCapacity(std.testing.allocator, source.len);
-
-    var tokenizer = Tokenizer.init(source);
-
-    while (true) {
-        const token = tokenizer.next();
-        try tokens.append(std.testing.allocator, .{
-            .tag = token.tag,
-            .start = token.loc.start,
-        });
-
-        if (token.tag == .eof)
-            break;
-    }
 
     var parser = Parser.init(std.testing.allocator, tokens.items(.tag), source, .{});
     defer parser.deinit();
