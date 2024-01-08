@@ -10,20 +10,20 @@ pub const Token = struct {
     };
 
     pub const keywords = std.ComptimeStringMap(Tag, .{
-        .{ "begin", .command_begin },
-        .{ "end", .command_end },
-        .{ "textbf", .command_textbf },
-        .{ "section", .command_section },
-        .{ "usepackage", .command_usepackage },
+        .{ "begin", .begin_command },
+        .{ "end", .end_command },
+        .{ "textbf", .textbf_command },
+        .{ "section", .section_command },
+        .{ "usepackage", .usepackage_command },
     });
 
     pub const Tag = enum {
         string_literal,
-        command_begin,
-        command_end,
-        command_usepackage,
-        command_textbf,
-        command_section,
+        begin_command,
+        end_command,
+        usepackage_command,
+        textbf_command,
+        section_command,
         backslash,
         left_brace,
         right_brace,
@@ -181,18 +181,18 @@ pub const Tokenizer = struct {
 test "Tokenizer: begin document" {
     try testTokenize("\\begin{document}\\textbf{Hello}This is a valid content\\end{document}", &.{
         .backslash,
-        .command_begin,
+        .begin_command,
         .left_brace,
         .string_literal,
         .right_brace,
         .backslash,
-        .command_textbf,
+        .textbf_command,
         .left_brace,
         .string_literal,
         .right_brace,
         .string_literal,
         .backslash,
-        .command_end,
+        .end_command,
         .left_brace,
         .string_literal,
         .right_brace,
@@ -203,7 +203,7 @@ test "Tokenizer: begin document" {
 test "Tokenizer: command with multiple arguments" {
     try testTokenize("\\textbf{argument1, argument2}", &.{
         .backslash,
-        .command_textbf,
+        .textbf_command,
         .left_brace,
         .string_literal,
         .comma,
@@ -214,7 +214,7 @@ test "Tokenizer: command with multiple arguments" {
 
     try testTokenize("\\usepackage[utf8]{inputenc}", &.{
         .backslash,
-        .command_usepackage,
+        .usepackage_command,
         .left_bracket,
         .string_literal,
         .right_bracket,
@@ -228,7 +228,7 @@ test "Tokenizer: command with multiple arguments" {
 test "Tokenizer: simple textbf" {
     try testTokenize("\\textbf{Hello}", &.{
         .backslash,
-        .command_textbf,
+        .textbf_command,
         .left_brace,
         .string_literal,
         .right_brace,
@@ -239,10 +239,10 @@ test "Tokenizer: simple textbf" {
 test "Tokenizer: recursive textbf" {
     try testTokenize("\\textbf{\\textbf{Hello}}", &.{
         .backslash,
-        .command_textbf,
+        .textbf_command,
         .left_brace,
         .backslash,
-        .command_textbf,
+        .textbf_command,
         .left_brace,
         .string_literal,
         .right_brace,
@@ -254,7 +254,7 @@ test "Tokenizer: recursive textbf" {
 test "Tokenizer: begin" {
     try testTokenize("\\begin{document}", &.{
         .backslash,
-        .command_begin,
+        .begin_command,
         .left_brace,
         .string_literal,
         .right_brace,
@@ -265,18 +265,18 @@ test "Tokenizer: begin" {
 test "Tokenizer: test with content in section and line break" {
     try testTokenize("\\begin{document}\n\\section{Introduction}\nContent of the introduction\n\\end{document}", &.{
         .backslash,
-        .command_begin,
+        .begin_command,
         .left_brace,
         .string_literal,
         .right_brace,
         .backslash,
-        .command_section,
+        .section_command,
         .left_brace,
         .string_literal,
         .right_brace,
         .string_literal,
         .backslash,
-        .command_end,
+        .end_command,
         .left_brace,
         .string_literal,
         .right_brace,

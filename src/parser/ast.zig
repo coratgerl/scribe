@@ -15,7 +15,8 @@ pub const Node = struct {
 
     pub const NodeKind = enum {
         root,
-        command,
+        textbf_command,
+        argument,
         string_literal,
     };
 };
