@@ -13,12 +13,7 @@ pub const Node = struct {
     end: usize,
     // TODO : For search optimization we will need to get the an array of children index
 
-    pub const NodeKind = enum {
-        root,
-        textbf_command,
-        argument,
-        string_literal,
-    };
+    pub const NodeKind = Token.Tag;
 };
 
 pub const Ast = struct {
@@ -41,6 +36,9 @@ pub const Ast = struct {
         pub const Tag = enum {
             missing_right_brace,
             missing_left_brace,
+            missing_right_bracket,
+            missing_left_bracket,
+            missing_argument,
             missing_backslash_before_command,
         };
     };

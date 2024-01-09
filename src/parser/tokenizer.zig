@@ -18,6 +18,8 @@ pub const Token = struct {
     });
 
     pub const Tag = enum {
+        root,
+        argument,
         string_literal,
         begin_command,
         end_command,

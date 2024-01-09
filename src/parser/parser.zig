@@ -18,6 +18,14 @@ pub const Parser = struct {
     nodes: NodeList,
     errors: std.MultiArrayList(AstError),
 
+    pub const ParserError = error{
+        MissingLeftBrace,
+        MissingRightBrace,
+        MissingBackslashBeforeCommand,
+        MissingArgument,
+        OutOfMemory,
+    };
+
     pub fn init(allocator: std.mem.Allocator, tokens: []Token.Tag, source: []const u8, nodes: NodeList) Parser {
         return Parser{
             .tokens = tokens,
@@ -45,7 +53,7 @@ pub const Parser = struct {
         return self.tokens[self.index - 1] == tag;
     }
 
-    pub fn parseRoot(self: *Parser) !void {
+    pub fn parseRoot(self: *Parser) ParserError!void {
         try self.nodes.append(self.allocator, .{
             .parent_index = 0,
             .kind = .root,
@@ -56,131 +64,85 @@ pub const Parser = struct {
         try self.parseBlock();
     }
 
-    pub fn parseBlock(self: *Parser) !void {
+    pub fn parseBlock(self: *Parser) ParserError!void {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
 
             switch (token) {
                 .textbf_command => {
-                    try self.parseCommand(.textbf_command);
+                    try self.parseCommand();
                 },
                 else => {},
             }
         }
     }
 
-    pub fn parseCommand(self: *Parser, node_kind: Node.NodeKind) !void {
+    // This function can only be call by parseCommand (the checks of brace and brackets are already done)
+    // Example of valid command : \textbf{Hello} or \usepackage[utf8]{test}
+    fn parseCommandArgument(self: *Parser) ParserError!void {
+        // Recursive case
+        if (self.tokens[self.index] == Token.Tag.backslash and self.tokens.len > self.index + 1) {
+            self.index += 1;
+            try self.parseCommand();
+        }
+
+        while (self.index < self.tokens.len) : (self.index += 1) {
+            const token: Token.Tag = self.tokens[self.index];
+
+            switch (token) {
+                .comma => {},
+                .string_literal => {
+                    // std.debug.print("Add node: argument\n", .{});
+                    try self.nodes.append(self.allocator, .{
+                        .parent_index = self.nodes.len - 1,
+                        .kind = .argument,
+                        .start = self.index,
+                        .end = self.index,
+                    });
+                },
+                .right_brace => {
+                    self.index += 1;
+                    break;
+                },
+                else => {},
+            }
+        }
+    }
+
+    pub fn parseCommand(self: *Parser) ParserError!void {
         if (!self.expectPreviousToken(Token.Tag.backslash)) {
             try self.errors.append(self.allocator, .{
                 .tag = .missing_backslash_before_command,
                 .token_index = self.index,
             });
+
+            return ParserError.MissingBackslashBeforeCommand;
         }
 
+        // TODO : implement case of \command[option]{arg}
         if (!self.expectNextToken(Token.Tag.left_brace)) {
             try self.errors.append(self.allocator, .{
                 .tag = .missing_left_brace,
                 .token_index = self.index,
             });
-        }
 
-        std.debug.print("Command: {any}\n", .{node_kind});
+            return ParserError.MissingLeftBrace;
+        }
 
         try self.nodes.append(self.allocator, .{
             .parent_index = self.nodes.len - 1,
-            .kind = node_kind,
+            .kind = self.tokens[self.index],
             .start = self.index,
             .end = self.index,
         });
+
+        // We jump after the brace/bracket directly to the argument/option
+        self.index += 2;
+
+        // TODO : 1. Parse options
+        // 2. Parse arguments
+        try self.parseCommandArgument();
     }
-
-    // A block is the content of { }
-    // For example in \textbf{Hello}, the content block is Hello
-    // pub fn parseBlock(self: *Parser) !void {
-    //     var block_state: ParserState = .invalid;
-
-    //     var left_brace_count: usize = 0;
-    //     var right_brace_count: usize = 0;
-    //     var parent_index: usize = 0;
-
-    //     while (self.index < self.tokens.len) : (self.index += 1) {
-    //         const token: Token.Tag = self.tokens[self.index];
-
-    //         // std.debug.print("token: {any}\n", .{token});
-
-    //         switch (token) {
-    //             .backslash => {
-    //                 block_state = .backslash_command;
-    //             },
-    //             .left_brace => switch (block_state) {
-    //                 .backslash_command => {
-    //                     block_state = .valid_command;
-    //                     left_brace_count += 1;
-    //                 },
-    //                 else => {
-    //                     left_brace_count += 1;
-    //                 },
-    //             },
-    //             .right_brace => {
-    //                 right_brace_count += 1;
-    //             },
-    //             .textbf_command => switch (block_state) {
-    //                 .backslash_command => {
-    //                     try self.nodes.append(self.allocator, .{
-    //                         .parent_index = parent_index,
-    //                         .kind = .command,
-    //                         .start = self.index,
-    //                         .end = self.index,
-    //                     });
-
-    //                     // std.debug.print("Command: {any}\n", .{token});
-
-    //                     parent_index = self.nodes.len - 1;
-    //                 },
-    //                 else => {
-    //                     try self.errors.append(self.allocator, .{
-    //                         .tag = .missing_backslash_before_command,
-    //                         .token_index = self.index,
-    //                     });
-
-    //                     // TODO : Handle error ?
-    //                 },
-    //             },
-    //             .string_literal => switch (block_state) {
-    //                 .valid_command => {
-    //                     try self.nodes.append(self.allocator, .{
-    //                         .parent_index = parent_index,
-    //                         .kind = .string_literal,
-    //                         .start = self.index,
-    //                         .end = self.index,
-    //                     });
-    //                 },
-    //                 .backslash_command => {
-    //                     try self.errors.append(self.allocator, .{
-    //                         .tag = .missing_left_brace,
-    //                         .token_index = self.index,
-    //                     });
-    //                 },
-    //                 else => {},
-    //             },
-    //             else => {},
-    //         }
-    //     }
-
-    //     if (left_brace_count != right_brace_count) {
-    //         if (left_brace_count > right_brace_count) {
-    //             try self.errors.append(self.allocator, .{
-    //                 .tag = .missing_right_brace,
-    //                 .token_index = self.index,
-    //             });
-    //         } else {
-    //             try self.errors.append(self.allocator, .{
-    //                 .tag = .missing_left_brace,
-    //                 .token_index = self.index,
-    //             });
-    //         }
-    //     }
-    // }
 };
 
 // Example of valid structure:
@@ -245,47 +207,47 @@ test "Parser: textbf" {
     }, &.{});
 }
 
-// test "Parser: recursive textbf" {
-//     const source = "\\textbf{\\textbf{Hello}}";
-//     try testParser(source, &.{
-//         .root,
-//         .command,
-//         .command,
-//         .string_literal,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//     }, &.{});
-// }
+test "Parser: recursive textbf" {
+    const source = "\\textbf{\\textbf{Hello}}";
+    try testParser(source, &.{
+        .root,
+        .textbf_command,
+        .textbf_command,
+        .argument,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+    }, &.{});
+}
 
-// test "Parser: double recursive textbf" {
-//     const source = "\\textbf{\\textbf{\\textbf{Hello}}}";
-//     try testParser(source, &.{
-//         .root,
-//         .command,
-//         .command,
-//         .command,
-//         .string_literal,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//         3,
-//     }, &.{});
-// }
+test "Parser: double recursive textbf" {
+    const source = "\\textbf{\\textbf{\\textbf{Hello}}}";
+    try testParser(source, &.{
+        .root,
+        .textbf_command,
+        .textbf_command,
+        .textbf_command,
+        .argument,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
+    }, &.{});
+}
 
 // test "Parser: missing one right brace" {
 //     const source = "\\textbf{\\textbf{\\textbf{Hello}}";
 
 //     try testParser(source, &.{
 //         .root,
-//         .command,
-//         .command,
-//         .command,
-//         .string_literal,
+//         .textbf_command,
+//         .textbf_command,
+//         .textbf_command,
+//         .argument,
 //     }, &.{
 //         0,
 //         0,
@@ -360,34 +322,26 @@ fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, 
     try parser.parseRoot();
 
     const slice = parser.nodes.slice();
-    _ = slice;
 
     const errors_slice = parser.errors.slice();
-    _ = errors_slice;
 
     var i: usize = 0;
     for (expected_tokens_kinds) |expected_token_kind| {
-        _ = expected_token_kind;
-
-        // try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
+        try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
 
         i += 1;
     }
 
     i = 0;
     for (parent_index) |index| {
-        _ = index;
-
-        // try std.testing.expectEqual(index, slice.get(i).parent_index);
+        try std.testing.expectEqual(index, slice.get(i).parent_index);
 
         i += 1;
     }
 
     i = 0;
     for (errors) |error_tag| {
-        _ = error_tag;
-
-        // try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
+        try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
 
         i += 1;
     }
