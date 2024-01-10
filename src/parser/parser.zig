@@ -86,6 +86,8 @@ pub const Parser = struct {
             try self.parseCommand();
         }
 
+        var right_brace_encountered = false;
+
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
 
@@ -102,10 +104,21 @@ pub const Parser = struct {
                 },
                 .right_brace => {
                     self.index += 1;
+
+                    right_brace_encountered = true;
                     break;
                 },
                 else => {},
             }
+        }
+
+        if (!right_brace_encountered) {
+            try self.errors.append(self.allocator, .{
+                .tag = .missing_right_brace,
+                .token_index = self.index,
+            });
+
+            return;
         }
     }
 
@@ -116,7 +129,7 @@ pub const Parser = struct {
                 .token_index = self.index,
             });
 
-            return ParserError.MissingBackslashBeforeCommand;
+            return;
         }
 
         // TODO : implement case of \command[option]{arg}
@@ -126,8 +139,10 @@ pub const Parser = struct {
                 .token_index = self.index,
             });
 
-            return ParserError.MissingLeftBrace;
+            return;
         }
+
+        // std.debug.print("Add command : {}\n", .{self.tokens[self.index]});
 
         try self.nodes.append(self.allocator, .{
             .parent_index = self.nodes.len - 1,
@@ -239,77 +254,71 @@ test "Parser: double recursive textbf" {
     }, &.{});
 }
 
-// test "Parser: missing one right brace" {
-//     const source = "\\textbf{\\textbf{\\textbf{Hello}}";
+test "Parser: missing one right brace" {
+    const source = "\\textbf{\\textbf{\\textbf{Hello}}";
 
-//     try testParser(source, &.{
-//         .root,
-//         .textbf_command,
-//         .textbf_command,
-//         .textbf_command,
-//         .argument,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//         3,
-//     }, &.{
-//         .missing_right_brace,
-//     });
-// }
+    try testParser(source, &.{
+        .root,
+        .textbf_command,
+        .textbf_command,
+        .textbf_command,
+        .argument,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        3,
+    }, &.{
+        .missing_right_brace,
+    });
+}
 
-// test "Parser: missing one left brace" {
-//     const source = "\\textbf{\\textbf{\\textbfHello}}}";
+test "Parser: missing one left brace" {
+    const source = "\\textbf{\\textbf{\\textbfHello}}}";
 
-//     try testParser(source, &.{
-//         .root,
-//         .command,
-//         .command,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//     }, &.{
-//         .missing_left_brace,
-//     });
+    try testParser(source, &.{
+        .root,
+        .textbf_command,
+        .textbf_command,
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{
+        .missing_left_brace,
+    });
 
-//     const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
+    const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
 
-//     try testParser(source2, &.{
-//         .root,
-//         .command,
-//         .command,
-//         .command,
-//         .string_literal,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//         3,
-//     }, &.{
-//         .missing_left_brace,
-//     });
+    try testParser(source2, &.{
+        .root,
+        .textbf_command,
+        .textbf_command,
+        .argument,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+    }, &.{
+        .missing_left_brace,
+    });
 
-//     const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
+    const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
 
-//     try testParser(source3, &.{
-//         .root,
-//         .command,
-//         .command,
-//         .command,
-//         .string_literal,
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//         3,
-//     }, &.{
-//         .missing_left_brace,
-//     });
-// }
+    try testParser(source3, &.{
+        .root,
+        .textbf_command,
+        .argument,
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{
+        .missing_left_brace,
+    });
+}
 
 fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
     var tokenizer = Tokenizer.init(source, std.testing.allocator);
