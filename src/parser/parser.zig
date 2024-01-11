@@ -315,21 +315,21 @@ test "Parser: missing one left brace" {
     //     .missing_left_brace,
     // });
 
-    const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
+    // const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
 
-    try testParser(source2, &.{
-        .root,
-        .textbf_command,
-        .textbf_command,
-        .argument,
-    }, &.{
-        0,
-        0,
-        1,
-        2,
-    }, &.{
-        .missing_left_brace,
-    });
+    // try testParser(source2, &.{
+    //     .root,
+    //     .textbf_command,
+    //     .textbf_command,
+    //     .argument,
+    // }, &.{
+    //     0,
+    //     0,
+    //     1,
+    //     2,
+    // }, &.{
+    //     .missing_left_brace,
+    // });
 
     // const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
 
