@@ -300,51 +300,51 @@ pub const Parser = struct {
 //     });
 // }
 
-test "Parser: missing one left brace" {
-    // const source = "\\textbf{\\textbf{\\textbfHello}}}";
+// test "Parser: missing one left brace" {
+// const source = "\\textbf{\\textbf{\\textbfHello}}}";
 
-    // try testParser(source, &.{
-    //     .root,
-    //     .textbf_command,
-    //     .textbf_command,
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    // }, &.{
-    //     .missing_left_brace,
-    // });
+// try testParser(source, &.{
+//     .root,
+//     .textbf_command,
+//     .textbf_command,
+// }, &.{
+//     0,
+//     0,
+//     1,
+// }, &.{
+//     .missing_left_brace,
+// });
 
-    // const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
+// const source2 = "\\textbf\\textbf{\\textbf{Hello}}}";
 
-    // try testParser(source2, &.{
-    //     .root,
-    //     .textbf_command,
-    //     .textbf_command,
-    //     .argument,
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    //     2,
-    // }, &.{
-    //     .missing_left_brace,
-    // });
+// try testParser(source2, &.{
+//     .root,
+//     .textbf_command,
+//     .textbf_command,
+//     .argument,
+// }, &.{
+//     0,
+//     0,
+//     1,
+//     2,
+// }, &.{
+//     .missing_left_brace,
+// });
 
-    // const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
+// const source3 = "\\textbf{\\textbf\\textbf{Hello}}}";
 
-    // try testParser(source3, &.{
-    //     .root,
-    //     .textbf_command,
-    //     .argument,
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    // }, &.{
-    //     .missing_left_brace,
-    // });
-}
+// try testParser(source3, &.{
+//     .root,
+//     .textbf_command,
+//     .argument,
+// }, &.{
+//     0,
+//     0,
+//     1,
+// }, &.{
+//     .missing_left_brace,
+// });
+// }
 
 // test "Parser: get command options" {
 //     const source = "\\usepackage[utf8]{test}";

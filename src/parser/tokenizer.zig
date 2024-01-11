@@ -10,30 +10,31 @@ pub const Token = struct {
     };
 
     pub const keywords = std.ComptimeStringMap(Tag, .{
-        .{ "begin", .begin_command },
-        .{ "end", .end_command },
-        .{ "textbf", .textbf_command },
-        .{ "section", .section_command },
-        .{ "usepackage", .usepackage_command },
+        .{ "title", .title_command },
+        .{ "bold", .bold_command },
+        .{ "figure", .figure_command },
+        .{ "image", .image_command },
+        .{ "caption", .caption_command },
+        .{ "equation", .equation_command },
+        .{ "list", .list_command },
     });
 
     pub const Tag = enum {
         root,
-        argument,
-        option,
+        title_command,
+        bold_command,
+        figure_command,
+        image_command,
+        caption_command,
+        equation_command,
+        list_command,
+        string_argument,
+        number_argument,
         string_literal,
-        begin_command,
-        end_command,
-        usepackage_command,
-        textbf_command,
-        section_command,
-        backslash,
-        left_brace,
-        right_brace,
-        left_bracket,
-        right_bracket,
         line_break,
         comma,
+        left_parenthesis,
+        right_parenthesis,
         eof,
     };
 };
@@ -101,8 +102,8 @@ pub const Tokenizer = struct {
 
             switch (state) {
                 .start => switch (c) {
-                    '\\' => {
-                        result.tag = .backslash;
+                    '(' => {
+                        result.tag = .left_parenthesis;
                         result.loc.start = self.index;
                         result.loc.end = self.index;
 
@@ -110,34 +111,8 @@ pub const Tokenizer = struct {
 
                         break;
                     },
-                    '[' => {
-                        result.tag = .left_bracket;
-                        result.loc.start = self.index;
-                        result.loc.end = self.index;
-
-                        self.index += 1;
-
-                        break;
-                    },
-                    ']' => {
-                        result.tag = .right_bracket;
-                        result.loc.start = self.index;
-                        result.loc.end = self.index;
-
-                        self.index += 1;
-
-                        break;
-                    },
-                    '{' => {
-                        result.tag = .left_brace;
-                        result.loc.start = self.index;
-                        result.loc.end = self.index;
-
-                        self.index += 1;
-                        break;
-                    },
-                    '}' => {
-                        result.tag = .right_brace;
+                    ')' => {
+                        result.tag = .right_parenthesis;
                         result.loc.start = self.index;
                         result.loc.end = self.index;
 
@@ -153,16 +128,24 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         break;
                     },
-                    'a'...'z', 'A'...'Z', ' ' => {
+                    'a'...'z', 'A'...'Z', '0'...'9' => {
                         result.tag = .string_literal;
                         state = .string_literal;
                     },
-                    '\n' => {},
+                    '\n' => {
+                        result.tag = .line_break;
+                        result.loc.start = self.index;
+                        result.loc.end = self.index;
+
+                        self.index += 1;
+                        break;
+                    },
                     else => {},
                 },
                 .string_literal => switch (c) {
-                    'a'...'z', 'A'...'Z', ' ' => {},
+                    'a'...'z', 'A'...'Z', ' ', '0'...'9', '.', '?', '!' => {},
                     else => {
+                        std.debug.print("string_literal: {s}\n", .{self.source[result.loc.start..self.index]});
                         if (Token.keywords.get(self.source[result.loc.start..self.index])) |tag| {
                             result.tag = tag;
                         } else {
@@ -181,113 +164,98 @@ pub const Tokenizer = struct {
     }
 };
 
-test "Tokenizer: begin document" {
-    try testTokenize("\\begin{document}\\textbf{Hello}This is a valid content\\end{document}", &.{
-        .backslash,
-        .begin_command,
-        .left_brace,
+test "Tokenizer: title" {
+    try testTokenize("title(Introduction)", &.{
+        .title_command,
+        .left_parenthesis,
         .string_literal,
-        .right_brace,
-        .backslash,
-        .textbf_command,
-        .left_brace,
-        .string_literal,
-        .right_brace,
-        .string_literal,
-        .backslash,
-        .end_command,
-        .left_brace,
-        .string_literal,
-        .right_brace,
+        .right_parenthesis,
         .eof,
     });
 }
 
-test "Tokenizer: command with multiple arguments" {
-    try testTokenize("\\textbf{argument1, argument2}", &.{
-        .backslash,
-        .textbf_command,
-        .left_brace,
+test "Tokenizer: title with number" {
+    try testTokenize("title(Introduction 1)", &.{
+        .title_command,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+
+    try testTokenize("title(1. Introduction)", &.{
+        .title_command,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+}
+
+test "Tokenizer: bold" {
+    try testTokenize("bold(Introduction)", &.{
+        .bold_command,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+}
+
+test "Tokenizer: list" {
+    try testTokenize("list(elem1, elem2)", &.{
+        .list_command,
+        .left_parenthesis,
         .string_literal,
         .comma,
         .string_literal,
-        .right_brace,
-        .eof,
-    });
-
-    try testTokenize("\\usepackage[utf8]{inputenc}", &.{
-        .backslash,
-        .usepackage_command,
-        .left_bracket,
-        .string_literal,
-        .right_bracket,
-        .left_brace,
-        .string_literal,
-        .right_brace,
+        .right_parenthesis,
         .eof,
     });
 }
 
-test "Tokenizer: simple textbf" {
-    try testTokenize("\\textbf{Hello}", &.{
-        .backslash,
-        .textbf_command,
-        .left_brace,
+test "Tokenizer: caption" {
+    try testTokenize("caption(caption text)", &.{
+        .caption_command,
+        .left_parenthesis,
         .string_literal,
-        .right_brace,
+        .right_parenthesis,
         .eof,
     });
 }
 
-test "Tokenizer: recursive textbf" {
-    try testTokenize("\\textbf{\\textbf{Hello}}", &.{
-        .backslash,
-        .textbf_command,
-        .left_brace,
-        .backslash,
-        .textbf_command,
-        .left_brace,
+test "Tokenizer: image" {
+    try testTokenize("image(test.png,100)", &.{
+        .image_command,
+        .left_parenthesis,
         .string_literal,
-        .right_brace,
-        .right_brace,
+        .comma,
+        .string_literal,
+        .right_parenthesis,
         .eof,
     });
 }
 
-test "Tokenizer: begin" {
-    try testTokenize("\\begin{document}", &.{
-        .backslash,
-        .begin_command,
-        .left_brace,
+// TODO: fix space before caption
+test "Tokenizer: figure" {
+    try testTokenize("figure(image(image.png, 80),caption(This is a caption))", &.{
+        .figure_command,
+        .left_parenthesis,
+        .image_command,
+        .left_parenthesis,
         .string_literal,
-        .right_brace,
+        .comma,
+        .string_literal,
+        .right_parenthesis,
+        .comma,
+        .caption_command,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .right_parenthesis,
         .eof,
     });
 }
-
-test "Tokenizer: test with content in section and line break" {
-    try testTokenize("\\begin{document}\n\\section{Introduction}\nContent of the introduction\n\\end{document}", &.{
-        .backslash,
-        .begin_command,
-        .left_brace,
-        .string_literal,
-        .right_brace,
-        .backslash,
-        .section_command,
-        .left_brace,
-        .string_literal,
-        .right_brace,
-        .string_literal,
-        .backslash,
-        .end_command,
-        .left_brace,
-        .string_literal,
-        .right_brace,
-        .eof,
-    });
-}
-
-// TODO: Create test for this use case \textbf{textbf}
 
 fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
     var tokenizer = Tokenizer.init(source, std.testing.allocator);
@@ -296,6 +264,7 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !v
 
     var i: usize = 0;
     for (expected_token_tags) |expected_token_tag| {
+        std.debug.print("tag: {any}\n", .{tokens.get(i).tag});
         try std.testing.expectEqual(expected_token_tag, tokens.get(i).tag);
 
         i += 1;

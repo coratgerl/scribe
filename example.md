@@ -1,11 +1,11 @@
 # Scribe basic example
 
-	title("Introduction")
-    
-    - First b("element")
-    - Second element
-    - Third element
+	title(Introduction)
+	
+	list(First b(element), Second element, Third element)
+	
+	This is the content text of the introduction section.
 
-    figure(image("image.png", 80), caption("This is a caption"))
+    figure(image(image.png, 80), caption(This is a caption))
      
-    eq("v(t) = a * b")
+    eq(v(t) = a * b)
