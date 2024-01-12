@@ -102,6 +102,9 @@ pub const Tokenizer = struct {
 
             switch (state) {
                 .start => switch (c) {
+                    ' ' => {
+                        result.loc.start = self.index + 1;
+                    },
                     '(' => {
                         result.tag = .left_parenthesis;
                         result.loc.start = self.index;
@@ -238,7 +241,7 @@ test "Tokenizer: image" {
 
 // TODO: fix space before caption
 test "Tokenizer: figure" {
-    try testTokenize("figure(image(image.png, 80),caption(This is a caption))", &.{
+    try testTokenize("figure(image(image.png, 80), caption(This is a caption))", &.{
         .figure_command,
         .left_parenthesis,
         .image_command,
