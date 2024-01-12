@@ -10,24 +10,24 @@ pub const Token = struct {
     };
 
     pub const keywords = std.ComptimeStringMap(Tag, .{
-        .{ "title", .title_command },
-        .{ "bold", .bold_command },
-        .{ "figure", .figure_command },
-        .{ "image", .image_command },
-        .{ "caption", .caption_command },
-        .{ "equation", .equation_command },
-        .{ "list", .list_command },
+        .{ "title", .title_function },
+        .{ "bold", .bold_function },
+        .{ "figure", .figure_function },
+        .{ "image", .image_function },
+        .{ "caption", .caption_function },
+        .{ "equation", .equation_function },
+        .{ "list", .list_function },
     });
 
     pub const Tag = enum {
         root,
-        title_command,
-        bold_command,
-        figure_command,
-        image_command,
-        caption_command,
-        equation_command,
-        list_command,
+        title_function,
+        bold_function,
+        figure_function,
+        image_function,
+        caption_function,
+        equation_function,
+        list_function,
         string_argument,
         number_argument,
         string_literal,
@@ -148,7 +148,6 @@ pub const Tokenizer = struct {
                 .string_literal => switch (c) {
                     'a'...'z', 'A'...'Z', ' ', '0'...'9', '.', '?', '!' => {},
                     else => {
-                        std.debug.print("string_literal: {s}\n", .{self.source[result.loc.start..self.index]});
                         if (Token.keywords.get(self.source[result.loc.start..self.index])) |tag| {
                             result.tag = tag;
                         } else {
@@ -168,9 +167,11 @@ pub const Tokenizer = struct {
 };
 
 test "Tokenizer: title" {
-    try testTokenize("title(Introduction)", &.{
-        .title_command,
+    try testTokenize("title(1, Introduction)", &.{
+        .title_function,
         .left_parenthesis,
+        .string_literal,
+        .comma,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -178,17 +179,21 @@ test "Tokenizer: title" {
 }
 
 test "Tokenizer: title with number" {
-    try testTokenize("title(Introduction 1)", &.{
-        .title_command,
+    try testTokenize("title(1, Introduction 1)", &.{
+        .title_function,
         .left_parenthesis,
+        .string_literal,
+        .comma,
         .string_literal,
         .right_parenthesis,
         .eof,
     });
 
-    try testTokenize("title(1. Introduction)", &.{
-        .title_command,
+    try testTokenize("title(1, 1. Introduction)", &.{
+        .title_function,
         .left_parenthesis,
+        .string_literal,
+        .comma,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -197,7 +202,7 @@ test "Tokenizer: title with number" {
 
 test "Tokenizer: bold" {
     try testTokenize("bold(Introduction)", &.{
-        .bold_command,
+        .bold_function,
         .left_parenthesis,
         .string_literal,
         .right_parenthesis,
@@ -207,7 +212,7 @@ test "Tokenizer: bold" {
 
 test "Tokenizer: list" {
     try testTokenize("list(elem1, elem2)", &.{
-        .list_command,
+        .list_function,
         .left_parenthesis,
         .string_literal,
         .comma,
@@ -219,7 +224,7 @@ test "Tokenizer: list" {
 
 test "Tokenizer: caption" {
     try testTokenize("caption(caption text)", &.{
-        .caption_command,
+        .caption_function,
         .left_parenthesis,
         .string_literal,
         .right_parenthesis,
@@ -229,7 +234,7 @@ test "Tokenizer: caption" {
 
 test "Tokenizer: image" {
     try testTokenize("image(test.png,100)", &.{
-        .image_command,
+        .image_function,
         .left_parenthesis,
         .string_literal,
         .comma,
@@ -239,19 +244,18 @@ test "Tokenizer: image" {
     });
 }
 
-// TODO: fix space before caption
 test "Tokenizer: figure" {
     try testTokenize("figure(image(image.png, 80), caption(This is a caption))", &.{
-        .figure_command,
+        .figure_function,
         .left_parenthesis,
-        .image_command,
+        .image_function,
         .left_parenthesis,
         .string_literal,
         .comma,
         .string_literal,
         .right_parenthesis,
         .comma,
-        .caption_command,
+        .caption_function,
         .left_parenthesis,
         .string_literal,
         .right_parenthesis,
@@ -267,7 +271,6 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !v
 
     var i: usize = 0;
     for (expected_token_tags) |expected_token_tag| {
-        std.debug.print("tag: {any}\n", .{tokens.get(i).tag});
         try std.testing.expectEqual(expected_token_tag, tokens.get(i).tag);
 
         i += 1;

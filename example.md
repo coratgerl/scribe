@@ -1,6 +1,6 @@
 # Scribe basic example
 
-	title(Introduction)
+	title(1, Introduction)
 	
 	list(First b(element), Second element, Third element)
 	

@@ -38,8 +38,6 @@ pub const Ast = struct {
             missing_left_brace,
             missing_right_bracket,
             missing_left_bracket,
-            missing_argument,
-            missing_backslash_before_command,
         };
     };
 
