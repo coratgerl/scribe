@@ -80,7 +80,7 @@ pub const Parser = struct {
     fn parseFunctionArgument(self: *Parser, function_index: usize) ParserError!void {
         if (!self.expectNextToken(Token.Tag.left_parenthesis)) {
             try self.errors.append(self.allocator, .{
-                .tag = AstError.Tag.missing_left_brace,
+                .tag = AstError.Tag.missing_left_parenthesis,
                 .token_index = self.index,
             });
             return;
@@ -111,6 +111,13 @@ pub const Parser = struct {
                 else => {},
             }
         }
+
+        if (!self.expectPreviousToken(Token.Tag.right_parenthesis)) {
+            try self.errors.append(self.allocator, .{
+                .tag = AstError.Tag.missing_right_parenthesis,
+                .token_index = self.index,
+            });
+        }
     }
 
     pub fn parseFunction(self: *Parser, parent_index: usize) ParserError!void {
@@ -139,6 +146,17 @@ test "Parser: bold" {
         0,
         1,
     }, &.{});
+}
+
+test "Parser: missing right parenthesis" {
+    const source = "bold(Hello";
+    try testParser(source, &.{ .root, .bold_function, .string_literal }, &.{
+        0,
+        0,
+        1,
+    }, &.{
+        .missing_right_parenthesis,
+    });
 }
 
 fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
