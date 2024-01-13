@@ -64,16 +64,20 @@ pub const Parser = struct {
         try self.parseBlock();
     }
 
+    fn switchToken(self: *Parser, token: Token.Tag) ParserError!void {
+        return switch (token) {
+            .bold_function => {
+                try self.parseFunction(0);
+            },
+            else => {},
+        };
+    }
+
     pub fn parseBlock(self: *Parser) ParserError!void {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
 
-            switch (token) {
-                .bold_function => {
-                    try self.parseFunction(0);
-                },
-                else => {},
-            }
+            try self.switchToken(token);
         }
     }
 
@@ -88,6 +92,11 @@ pub const Parser = struct {
 
         // We skip the parenthesis
         self.index += 2;
+
+        // For the recursive case : bold(bold(Hello))
+        if (self.tokens[self.index] != Token.Tag.string_literal) {
+            try self.switchToken(self.tokens[self.index]);
+        }
 
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token = self.tokens[self.index];
@@ -157,6 +166,21 @@ test "Parser: missing right parenthesis" {
     }, &.{
         .missing_right_parenthesis,
     });
+}
+
+test "Parser: recursive bold function" {
+    const source = "bold(bold(Hello))";
+    try testParser(source, &.{
+        .root,
+        .bold_function,
+        .bold_function,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+    }, &.{});
 }
 
 fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
