@@ -61,23 +61,25 @@ pub const Parser = struct {
             .end = 0,
         });
 
-        try self.parseBlock();
+        try self.parseBlock(0);
     }
 
-    fn switchToken(self: *Parser, token: Token.Tag) ParserError!void {
+    fn switchToken(self: *Parser, token: Token.Tag, parent_index: usize) ParserError!void {
         return switch (token) {
-            .bold_function => {
-                try self.parseFunction(0);
+            .title_function,
+            .bold_function,
+            => {
+                try self.parseFunction(parent_index);
             },
             else => {},
         };
     }
 
-    pub fn parseBlock(self: *Parser) ParserError!void {
+    pub fn parseBlock(self: *Parser, parent_index: usize) ParserError!void {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token: Token.Tag = self.tokens[self.index];
 
-            try self.switchToken(token);
+            try self.switchToken(token, parent_index);
         }
     }
 
@@ -95,7 +97,7 @@ pub const Parser = struct {
 
         // For the recursive case : bold(bold(Hello))
         if (self.tokens[self.index] != Token.Tag.string_literal) {
-            try self.switchToken(self.tokens[self.index]);
+            try self.switchToken(self.tokens[self.index], self.nodes.len - 1);
         }
 
         while (self.index < self.tokens.len) : (self.index += 1) {
@@ -130,12 +132,9 @@ pub const Parser = struct {
     }
 
     pub fn parseFunction(self: *Parser, parent_index: usize) ParserError!void {
-        _ = parent_index;
-
-        // TODO : Add test to check the start and end index
         try self.nodes.append(self.allocator, .{
-            .parent_index = self.nodes.len - 1,
-            .kind = .bold_function,
+            .parent_index = parent_index,
+            .kind = self.tokens[self.index],
             .start = self.index,
             .end = self.index,
         });
@@ -180,6 +179,19 @@ test "Parser: recursive bold function" {
         0,
         1,
         2,
+    }, &.{});
+}
+
+test "Parser: title function" {
+    const source = "title(Hello)";
+    try testParser(source, &.{
+        .root,
+        .title_function,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
     }, &.{});
 }
 
