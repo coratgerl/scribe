@@ -210,6 +210,14 @@ test "Tokenizer: bold" {
     });
 }
 
+test "Tokenizer: bold missing left parenthesis" {
+    try testTokenize("bold Introduction)", &.{
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+}
+
 test "Tokenizer: list" {
     try testTokenize("list(elem1, elem2)", &.{
         .list_function,
