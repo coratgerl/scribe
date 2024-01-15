@@ -131,7 +131,7 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         break;
                     },
-                    'a'...'z', 'A'...'Z', '0'...'9' => {
+                    'a'...'z', 'A'...'Z', '0'...'9', '.', '?', '!' => {
                         result.tag = .string_literal;
                         state = .string_literal;
                     },
@@ -168,6 +168,16 @@ pub const Tokenizer = struct {
 
 test "Tokenizer: title" {
     try testTokenize("title(1, Introduction)", &.{
+        .title_function,
+        .left_parenthesis,
+        .string_literal,
+        .comma,
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+
+    try testTokenize("title(1,Introduction)", &.{
         .title_function,
         .left_parenthesis,
         .string_literal,

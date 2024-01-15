@@ -67,6 +67,9 @@ pub const Parser = struct {
 
     fn switchToken(self: *Parser, token: Token.Tag, parent_index: usize) ParserError!void {
         return switch (token) {
+            .list_function,
+            .equation_function,
+            .caption_function,
             .title_function,
             .bold_function,
             => {
@@ -80,7 +83,6 @@ pub const Parser = struct {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token = self.tokens[self.index];
 
-            std.debug.print("Token : {any}\n", .{token});
             try self.switchToken(token, parent_index);
         }
     }
@@ -104,6 +106,8 @@ pub const Parser = struct {
 
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token = self.tokens[self.index];
+
+            std.debug.print("Token : {any}\n", .{token});
 
             switch (token) {
                 .string_literal => {
@@ -134,7 +138,8 @@ pub const Parser = struct {
     }
 
     pub fn parseFunction(self: *Parser, parent_index: usize) ParserError!void {
-        std.debug.print("Add : {any}\n", .{self.tokens[self.index]});
+        std.debug.print("Add: function\n", .{});
+
         try self.nodes.append(self.allocator, .{
             .parent_index = parent_index,
             .kind = self.tokens[self.index],
@@ -157,20 +162,6 @@ pub const Parser = struct {
 //         0,
 //         1,
 //     }, &.{});
-// }
-
-// test "Parser: missing left parenthesis" {
-//     const source = "bold Hello)";
-
-//     try testParser(source, &.{
-//         .root,
-//         .bold_function,
-//     }, &.{
-//         0,
-//         0,
-//     }, &.{
-//         .missing_left_parenthesis,
-//     });
 // }
 
 // test "Parser: missing right parenthesis" {
@@ -200,10 +191,25 @@ pub const Parser = struct {
 // }
 
 // test "Parser: title function" {
-//     const source = "title(Hello)";
+//     const source = "title(1, Hello)";
 //     try testParser(source, &.{
 //         .root,
 //         .title_function,
+//         .string_literal,
+//         .string_literal,
+//     }, &.{
+//         0,
+//         0,
+//         1,
+//         1,
+//     }, &.{});
+// }
+
+// test "Parser: caption function" {
+//     const source = "caption(Hello)";
+//     try testParser(source, &.{
+//         .root,
+//         .caption_function,
 //         .string_literal,
 //     }, &.{
 //         0,
@@ -212,10 +218,81 @@ pub const Parser = struct {
 //     }, &.{});
 // }
 
-fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
-    _ = parent_index;
-    _ = errors;
+// test "Parser: equation function" {
+//     const source = "equation(Hello)";
+//     try testParser(source, &.{
+//         .root,
+//         .equation_function,
+//         .string_literal,
+//     }, &.{
+//         0,
+//         0,
+//         1,
+//     }, &.{});
+// }
 
+test "Parser: list function" {
+    const source = "list(Hello)";
+    try testParser(source, &.{
+        .root,
+        .list_function,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
+
+    const source2 = "list(Hello, World)";
+
+    try testParser(source2, &.{
+        .root,
+        .list_function,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+    }, &.{});
+
+    const source3 = "list(Hello, World, !)";
+
+    try testParser(source3, &.{
+        .root,
+        .list_function,
+        .string_literal,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+        1,
+    }, &.{});
+
+    const source4 = "list(Element bold(a), Element b)";
+
+    try testParser(source4, &.{
+        .root,
+        .list_function,
+        .string_literal,
+        .bold_function,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+        3,
+        1,
+    }, &.{});
+}
+
+fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, parent_index: []const usize, errors: []const AstError.Tag) !void {
     var tokenizer = Tokenizer.init(source, std.testing.allocator);
     var tokens = try tokenizer.tokenize();
     defer tokens.deinit(std.testing.allocator);
@@ -226,31 +303,27 @@ fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, 
     try parser.parseRoot();
 
     const slice = parser.nodes.slice();
-    _ = slice;
 
     const errors_slice = parser.errors.slice();
-    _ = errors_slice;
 
     var i: usize = 0;
     for (expected_tokens_kinds) |expected_token_kind| {
-        _ = expected_token_kind;
-
-        // try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
+        try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
 
         i += 1;
     }
 
-    // i = 0;
-    // for (parent_index) |index| {
-    //     try std.testing.expectEqual(index, slice.get(i).parent_index);
+    i = 0;
+    for (parent_index) |index| {
+        try std.testing.expectEqual(index, slice.get(i).parent_index);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 
-    // i = 0;
-    // for (errors) |error_tag| {
-    //     try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
+    i = 0;
+    for (errors) |error_tag| {
+        try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 }
