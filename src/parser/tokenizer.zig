@@ -33,6 +33,7 @@ pub const Token = struct {
         string_literal,
         line_break,
         comma,
+        space,
         left_parenthesis,
         right_parenthesis,
         eof,
@@ -46,6 +47,7 @@ pub const Tokenizer = struct {
 
     pub const State = enum {
         start,
+        backslash,
         string_literal,
     };
 
@@ -71,6 +73,8 @@ pub const Tokenizer = struct {
         var i: usize = 0;
         while (true) {
             const token = self.next();
+
+            std.debug.print("Token : {any}\n", .{token.tag});
 
             try tokens.append(self.allocator, .{
                 .tag = token.tag,
@@ -103,7 +107,13 @@ pub const Tokenizer = struct {
             switch (state) {
                 .start => switch (c) {
                     ' ' => {
-                        result.loc.start = self.index + 1;
+                        result.tag = .space;
+                        result.loc.start = self.index;
+                        result.loc.end = self.index;
+
+                        self.index += 1;
+
+                        break;
                     },
                     '(' => {
                         result.tag = .left_parenthesis;
@@ -143,15 +153,27 @@ pub const Tokenizer = struct {
                         self.index += 1;
                         break;
                     },
+                    '\\' => {
+                        // \\ permit to ignore the next command for example : caption(\caption text)
+                        result.tag = .string_literal;
+                        result.loc.start += 1;
+
+                        state = .backslash;
+                    },
                     else => {},
                 },
+                .backslash => switch (c) {
+                    'a'...'z', 'A'...'Z', '0'...'9', '.', '?', '!' => {},
+                    else => {
+                        result.tag = .string_literal;
+                        break;
+                    },
+                },
                 .string_literal => switch (c) {
-                    'a'...'z', 'A'...'Z', ' ', '0'...'9', '.', '?', '!' => {},
+                    'a'...'z', 'A'...'Z', '0'...'9', '.', '?', '!' => {},
                     else => {
                         if (Token.keywords.get(self.source[result.loc.start..self.index])) |tag| {
                             result.tag = tag;
-                        } else {
-                            result.tag = .string_literal;
                         }
 
                         break;
@@ -172,6 +194,7 @@ test "Tokenizer: title" {
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -194,6 +217,9 @@ test "Tokenizer: title with number" {
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
+        .string_literal,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -204,6 +230,9 @@ test "Tokenizer: title with number" {
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
+        .string_literal,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -222,18 +251,41 @@ test "Tokenizer: bold" {
 
 test "Tokenizer: bold missing left parenthesis" {
     try testTokenize("bold Introduction)", &.{
+        .bold_function,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
     });
 }
 
-test "Tokenizer: list" {
+test "Tokenizer: list simple" {
     try testTokenize("list(elem1, elem2)", &.{
         .list_function,
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
+        .string_literal,
+        .right_parenthesis,
+        .eof,
+    });
+}
+
+test "Tokenizer: list complex" {
+    try testTokenize("list(Element bold(a), Element b)", &.{
+        .list_function,
+        .left_parenthesis,
+        .string_literal,
+        .space,
+        .bold_function,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .comma,
+        .space,
+        .string_literal,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -241,9 +293,11 @@ test "Tokenizer: list" {
 }
 
 test "Tokenizer: caption" {
-    try testTokenize("caption(caption text)", &.{
+    try testTokenize("caption(\\caption text)", &.{
         .caption_function,
         .left_parenthesis,
+        .string_literal,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -251,11 +305,12 @@ test "Tokenizer: caption" {
 }
 
 test "Tokenizer: image" {
-    try testTokenize("image(test.png,100)", &.{
+    try testTokenize("image(test.png, 100)", &.{
         .image_function,
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
         .string_literal,
         .right_parenthesis,
         .eof,
@@ -263,18 +318,26 @@ test "Tokenizer: image" {
 }
 
 test "Tokenizer: figure" {
-    try testTokenize("figure(image(image.png, 80), caption(This is a caption))", &.{
+    try testTokenize("figure(image(image.png, 80), caption(This is a \\caption))", &.{
         .figure_function,
         .left_parenthesis,
         .image_function,
         .left_parenthesis,
         .string_literal,
         .comma,
+        .space,
         .string_literal,
         .right_parenthesis,
         .comma,
+        .space,
         .caption_function,
         .left_parenthesis,
+        .string_literal,
+        .space,
+        .string_literal,
+        .space,
+        .string_literal,
+        .space,
         .string_literal,
         .right_parenthesis,
         .right_parenthesis,
