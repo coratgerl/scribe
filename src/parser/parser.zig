@@ -108,6 +108,8 @@ pub const Parser = struct {
 
         var state: State = .start;
 
+        const start_index = self.loc[self.index].start;
+
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token = self.tokens[self.index];
 
@@ -131,14 +133,14 @@ pub const Parser = struct {
                     switch (token) {
                         .right_parenthesis => {
                             std.debug.print("Add : string_literal => start :{d} - end {d}\n", .{
-                                self.loc[self.index].start,
+                                start_index,
                                 self.loc[self.index].end,
                             });
 
                             try self.nodes.append(self.allocator, .{
                                 .parent_index = function_index,
                                 .kind = .string_literal,
-                                .start = self.loc[self.index].start,
+                                .start = start_index,
                                 .end = self.loc[self.index].end,
                             });
 
