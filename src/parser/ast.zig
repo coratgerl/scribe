@@ -44,7 +44,7 @@ pub const Ast = struct {
         var tokens = try tokenizer.tokenize();
         defer tokens.deinit(std.testing.allocator);
 
-        const parser = Parser.init(allocator, tokens.items(.tag), source, .{});
+        const parser = Parser.init(allocator, tokens.items(.tag), tokens.items(.loc), source, .{});
         _ = parser;
 
         return .{

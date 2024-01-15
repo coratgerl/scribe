@@ -53,7 +53,7 @@ pub const Tokenizer = struct {
 
     pub const TokenList = std.MultiArrayList(struct {
         tag: Token.Tag,
-        start: usize,
+        loc: Token.Location,
     });
 
     pub fn init(source: []const u8, allocator: std.mem.Allocator) Tokenizer {
@@ -74,11 +74,9 @@ pub const Tokenizer = struct {
         while (true) {
             const token = self.next();
 
-            std.debug.print("Token : {any}\n", .{token.tag});
-
             try tokens.append(self.allocator, .{
                 .tag = token.tag,
-                .start = token.loc.start,
+                .loc = token.loc,
             });
 
             if (token.tag == .eof)
@@ -182,7 +180,7 @@ pub const Tokenizer = struct {
             }
         }
 
-        result.loc.end = self.index;
+        result.loc.end = self.index - 1;
 
         return result;
     }
@@ -198,6 +196,14 @@ test "Tokenizer: title" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 4 },
+        .{ .start = 5, .end = 5 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 7, .end = 7 },
+        .{ .start = 8, .end = 8 },
+        .{ .start = 9, .end = 20 },
+        .{ .start = 21, .end = 21 },
     });
 
     try testTokenize("title(1,Introduction)", &.{
@@ -208,6 +214,13 @@ test "Tokenizer: title" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 4 },
+        .{ .start = 5, .end = 5 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 7, .end = 7 },
+        .{ .start = 8, .end = 19 },
+        .{ .start = 20, .end = 20 },
     });
 }
 
@@ -223,6 +236,14 @@ test "Tokenizer: title with number" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 4 },
+        .{ .start = 5, .end = 5 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 7, .end = 7 },
+        .{ .start = 8, .end = 8 },
+        .{ .start = 9, .end = 20 },
+        .{ .start = 21, .end = 21 },
     });
 
     try testTokenize("title(1, 1. Introduction)", &.{
@@ -236,6 +257,16 @@ test "Tokenizer: title with number" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 4 },
+        .{ .start = 5, .end = 5 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 7, .end = 7 },
+        .{ .start = 8, .end = 8 },
+        .{ .start = 9, .end = 10 },
+        .{ .start = 11, .end = 11 },
+        .{ .start = 12, .end = 23 },
+        .{ .start = 24, .end = 24 },
     });
 }
 
@@ -246,6 +277,31 @@ test "Tokenizer: bold" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 3 },
+        .{ .start = 4, .end = 4 },
+        .{ .start = 5, .end = 16 },
+        .{ .start = 17, .end = 17 },
+    });
+}
+
+test "Tokenizer: bold recursive" {
+    try testTokenize("bold(bold(Introduction))", &.{
+        .bold_function,
+        .left_parenthesis,
+        .bold_function,
+        .left_parenthesis,
+        .string_literal,
+        .right_parenthesis,
+        .right_parenthesis,
+        .eof,
+    }, &.{
+        .{ .start = 0, .end = 3 },
+        .{ .start = 4, .end = 4 },
+        .{ .start = 5, .end = 8 },
+        .{ .start = 9, .end = 9 },
+        .{ .start = 10, .end = 21 },
+        .{ .start = 22, .end = 22 },
     });
 }
 
@@ -256,6 +312,11 @@ test "Tokenizer: bold missing left parenthesis" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 3 },
+        .{ .start = 4, .end = 4 },
+        .{ .start = 5, .end = 16 },
+        .{ .start = 17, .end = 17 },
     });
 }
 
@@ -269,6 +330,14 @@ test "Tokenizer: list simple" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 3 },
+        .{ .start = 4, .end = 4 },
+        .{ .start = 5, .end = 9 },
+        .{ .start = 10, .end = 10 },
+        .{ .start = 11, .end = 11 },
+        .{ .start = 12, .end = 16 },
+        .{ .start = 17, .end = 17 },
     });
 }
 
@@ -289,6 +358,21 @@ test "Tokenizer: list complex" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 3 },
+        .{ .start = 4, .end = 4 },
+        .{ .start = 5, .end = 11 },
+        .{ .start = 12, .end = 12 },
+        .{ .start = 13, .end = 16 },
+        .{ .start = 17, .end = 17 },
+        .{ .start = 18, .end = 18 },
+        .{ .start = 19, .end = 19 },
+        .{ .start = 20, .end = 20 },
+        .{ .start = 21, .end = 21 },
+        .{ .start = 22, .end = 28 },
+        .{ .start = 29, .end = 29 },
+        .{ .start = 30, .end = 30 },
+        .{ .start = 31, .end = 31 },
     });
 }
 
@@ -301,6 +385,12 @@ test "Tokenizer: caption" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 6 },
+        .{ .start = 7, .end = 7 },
+        .{ .start = 9, .end = 15 },
+        .{ .start = 16, .end = 16 },
+        .{ .start = 17, .end = 20 },
     });
 }
 
@@ -314,6 +404,14 @@ test "Tokenizer: image" {
         .string_literal,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 4 },
+        .{ .start = 5, .end = 5 },
+        .{ .start = 6, .end = 13 },
+        .{ .start = 14, .end = 14 },
+        .{ .start = 15, .end = 15 },
+        .{ .start = 16, .end = 18 },
+        .{ .start = 19, .end = 19 },
     });
 }
 
@@ -342,10 +440,33 @@ test "Tokenizer: figure" {
         .right_parenthesis,
         .right_parenthesis,
         .eof,
+    }, &.{
+        .{ .start = 0, .end = 5 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 7, .end = 11 },
+        .{ .start = 12, .end = 12 },
+        .{ .start = 13, .end = 21 },
+        .{ .start = 22, .end = 22 },
+        .{ .start = 23, .end = 23 },
+        .{ .start = 24, .end = 25 },
+        .{ .start = 26, .end = 26 },
+        .{ .start = 27, .end = 27 },
+        .{ .start = 28, .end = 28 },
+        .{ .start = 29, .end = 35 },
+        .{ .start = 36, .end = 36 },
+        .{ .start = 37, .end = 40 },
+        .{ .start = 41, .end = 41 },
+        .{ .start = 42, .end = 43 },
+        .{ .start = 44, .end = 44 },
+        .{ .start = 45, .end = 45 },
+        .{ .start = 46, .end = 46 },
+        .{ .start = 48, .end = 54 },
+        .{ .start = 55, .end = 55 },
+        .{ .start = 56, .end = 56 },
     });
 }
 
-fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !void {
+fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag, expected_location: []const Token.Location) !void {
     var tokenizer = Tokenizer.init(source, std.testing.allocator);
     var tokens = try tokenizer.tokenize();
     defer tokens.deinit(std.testing.allocator);
@@ -353,6 +474,14 @@ fn testTokenize(source: [:0]const u8, expected_token_tags: []const Token.Tag) !v
     var i: usize = 0;
     for (expected_token_tags) |expected_token_tag| {
         try std.testing.expectEqual(expected_token_tag, tokens.get(i).tag);
+
+        i += 1;
+    }
+
+    i = 0;
+    for (expected_location) |location| {
+        try std.testing.expectEqual(location.start, tokens.get(i).loc.start);
+        try std.testing.expectEqual(location.end, tokens.get(i).loc.end);
 
         i += 1;
     }
