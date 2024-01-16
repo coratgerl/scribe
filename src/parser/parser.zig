@@ -102,12 +102,7 @@ pub const Parser = struct {
         while (self.index < self.tokens.len) : (self.index += 1) {
             const token = self.tokens[self.index];
 
-            std.debug.print("Token : {any}\n", .{token});
-
-            // For the recursive case : Example bold(bold(Hello))
-            // if (token != Token.Tag.string_literal) {
-            //     try self.switchToken(self.tokens[self.index], self.nodes.len - 1);
-            // }
+            // std.debug.print("Token : {any}\n", .{token});
 
             switch (state) {
                 .start => {
@@ -118,14 +113,17 @@ pub const Parser = struct {
                         .string_literal => {
                             state = .string_literal;
                         },
-                        else => {},
+                        else => {
+                            // For the recursive case : Example bold(bold(Hello))
+                            try self.switchToken(self.tokens[self.index], function_index);
+                        },
                     }
                 },
                 .string_literal => {
                     switch (token) {
                         .space => {
                             if (!self.expectNextToken(Token.Tag.string_literal)) {
-                                std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
+                                // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
 
                                 try self.nodes.append(self.allocator, .{
                                     .parent_index = function_index,
@@ -138,7 +136,7 @@ pub const Parser = struct {
                         .string_literal => {},
                         .comma => {
                             if (self.expectPreviousToken(Token.Tag.string_literal)) {
-                                std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
+                                // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
 
                                 try self.nodes.append(self.allocator, .{
                                     .parent_index = function_index,
@@ -155,7 +153,7 @@ pub const Parser = struct {
                             break;
                         },
                         .right_parenthesis => {
-                            std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index {d}\n", .{ start_index, self.loc[self.index].end - 1, function_index });
+                            // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index {d}\n", .{ start_index, self.loc[self.index].end - 1, function_index });
 
                             try self.nodes.append(self.allocator, .{
                                 .parent_index = function_index,
@@ -167,15 +165,7 @@ pub const Parser = struct {
                             break;
                         },
                         else => {
-                            // std.debug.print("Add : string_literal => start :{d} - end {d} - index {d}\n", .{ start_index, self.loc[self.index].end - 1, self.index });
-
-                            // try self.nodes.append(self.allocator, .{
-                            //     .parent_index = function_index,
-                            //     .kind = .string_literal,
-                            //     .start = start_index,
-                            //     .end = self.loc[self.index].end - 1,
-                            // });
-
+                            // For the recursive case : Example bold(bold(Hello))
                             try self.switchToken(self.tokens[self.index], function_index);
                         },
                     }
@@ -185,7 +175,7 @@ pub const Parser = struct {
     }
 
     fn parseFunction(self: *Parser, parent_index: usize) ParserError!void {
-        std.debug.print("Add function :{any} - start : {d} - end : {d} - parent_index : {d} \n", .{ self.tokens[self.index], self.loc[self.index].start, self.loc[self.index].end, parent_index });
+        // std.debug.print("Add function :{any} - start : {d} - end : {d} - parent_index : {d} \n", .{ self.tokens[self.index], self.loc[self.index].start, self.loc[self.index].end, parent_index });
         try self.nodes.append(self.allocator, .{
             .parent_index = parent_index,
             .kind = self.tokens[self.index],
@@ -215,186 +205,186 @@ pub const Parser = struct {
     }
 };
 
-// test "Parser: bold" {
-//     const source = "bold(Hello world)";
+test "Parser: bold" {
+    const source = "bold(Hello world)";
 
-//     try testParser(source, &.{
-//         .root,
-//         .bold_function,
-//         .string_literal,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 3 },
-//         .{ .start = 5, .end = 15 },
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//     }, &.{});
-// }
+    try testParser(source, &.{
+        .root,
+        .bold_function,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 15 },
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
+}
 
-// test "Parser: missing right parenthesis" {
-//     const source = "bold(Hello";
-//     try testParser(source, &.{
-//         .root,
-//         .bold_function,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 3 },
-//     }, &.{
-//         0,
-//         0,
-//     }, &.{
-//         .missing_right_parenthesis,
-//     });
-// }
+test "Parser: missing right parenthesis" {
+    const source = "bold(Hello";
+    try testParser(source, &.{
+        .root,
+        .bold_function,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+    }, &.{
+        0,
+        0,
+    }, &.{
+        .missing_right_parenthesis,
+    });
+}
 
-// test "Parser: recursive bold function" {
-//     const source = "bold(bold(Hello))";
-//     try testParser(source, &.{
-//         .root,
-//         .bold_function,
-//         .bold_function,
-//         .string_literal,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 3 },
-//         .{ .start = 5, .end = 8 },
-//         .{ .start = 10, .end = 14 },
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         2,
-//     }, &.{});
-// }
+test "Parser: recursive bold function" {
+    const source = "bold(bold(Hello))";
+    try testParser(source, &.{
+        .root,
+        .bold_function,
+        .bold_function,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 8 },
+        .{ .start = 10, .end = 14 },
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+    }, &.{});
+}
 
-// test "Parser: missing left parenthesis" {
-//     const source = "bold Hello)";
-//     try testParser(source, &.{
-//         .root,
-//         .bold_function,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 3 },
-//     }, &.{
-//         0,
-//         0,
-//     }, &.{
-//         .missing_left_parenthesis,
-//     });
-// }
+test "Parser: missing left parenthesis" {
+    const source = "bold Hello)";
+    try testParser(source, &.{
+        .root,
+        .bold_function,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+    }, &.{
+        0,
+        0,
+    }, &.{
+        .missing_left_parenthesis,
+    });
+}
 
-// test "Parser: title function" {
-//     const source = "title(1, Hello )";
-//     try testParser(source, &.{
-//         .root,
-//         .title_function,
-//         .string_literal,
-//         .string_literal,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 4 },
-//         .{ .start = 6, .end = 6 },
-//         .{ .start = 9, .end = 14 },
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//         1,
-//     }, &.{});
-// }
+test "Parser: title function" {
+    const source = "title(1, Hello )";
+    try testParser(source, &.{
+        .root,
+        .title_function,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 4 },
+        .{ .start = 6, .end = 6 },
+        .{ .start = 9, .end = 14 },
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+    }, &.{});
+}
 
-// test "Parser: caption function" {
-//     const source = "caption(Hello)";
-//     try testParser(source, &.{
-//         .root,
-//         .caption_function,
-//         .string_literal,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 6 },
-//         .{ .start = 8, .end = 12 },
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//     }, &.{});
-// }
+test "Parser: caption function" {
+    const source = "caption(Hello)";
+    try testParser(source, &.{
+        .root,
+        .caption_function,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 6 },
+        .{ .start = 8, .end = 12 },
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
+}
 
-// test "Parser: equation function" {
-//     const source = "equation(Hello)";
-//     try testParser(source, &.{
-//         .root,
-//         .equation_function,
-//         .string_literal,
-//     }, &.{
-//         .{ .start = 0, .end = 0 },
-//         .{ .start = 0, .end = 7 },
-//         .{ .start = 9, .end = 13 },
-//     }, &.{
-//         0,
-//         0,
-//         1,
-//     }, &.{});
-// }
+test "Parser: equation function" {
+    const source = "equation(Hello)";
+    try testParser(source, &.{
+        .root,
+        .equation_function,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 7 },
+        .{ .start = 9, .end = 13 },
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
+}
 
 test "Parser: list function" {
-    // const source = "list(Hello)";
-    // try testParser(source, &.{
-    //     .root,
-    //     .list_function,
-    //     .string_literal,
-    // }, &.{
-    //     .{ .start = 0, .end = 0 },
-    //     .{ .start = 0, .end = 3 },
-    //     .{ .start = 5, .end = 9 },
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    // }, &.{});
+    const source = "list(Hello)";
+    try testParser(source, &.{
+        .root,
+        .list_function,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 9 },
+    }, &.{
+        0,
+        0,
+        1,
+    }, &.{});
 
-    // const source2 = "list(Hello, World)";
+    const source2 = "list(Hello, World)";
 
-    // try testParser(source2, &.{
-    //     .root,
-    //     .list_function,
-    //     .string_literal,
-    //     .string_literal,
-    // }, &.{
-    //     .{ .start = 0, .end = 0 },
-    //     .{ .start = 0, .end = 3 },
-    //     .{ .start = 5, .end = 9 },
-    //     .{ .start = 12, .end = 16 },
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    //     1,
-    // }, &.{});
+    try testParser(source2, &.{
+        .root,
+        .list_function,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 9 },
+        .{ .start = 12, .end = 16 },
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+    }, &.{});
 
-    // const source3 = "list(Hello, World, !)";
+    const source3 = "list(Hello, World, !)";
 
-    // try testParser(source3, &.{
-    //     .root,
-    //     .list_function,
-    //     .string_literal,
-    //     .string_literal,
-    //     .string_literal,
-    // }, &.{
-    //     .{ .start = 0, .end = 0 },
-    //     .{ .start = 0, .end = 3 },
-    //     .{ .start = 5, .end = 9 },
-    //     .{ .start = 12, .end = 16 },
-    //     .{ .start = 19, .end = 19 },
-    // }, &.{
-    //     0,
-    //     0,
-    //     1,
-    //     1,
-    //     1,
-    // }, &.{});
+    try testParser(source3, &.{
+        .root,
+        .list_function,
+        .string_literal,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 9 },
+        .{ .start = 12, .end = 16 },
+        .{ .start = 19, .end = 19 },
+    }, &.{
+        0,
+        0,
+        1,
+        1,
+        1,
+    }, &.{});
 
     const source4 = "list(Element bold(a), Element b)";
 
@@ -423,11 +413,6 @@ test "Parser: list function" {
 }
 
 fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, expected_location: []const Token.Location, parent_index: []const usize, errors: []const AstError.Tag) !void {
-    _ = expected_tokens_kinds;
-    _ = expected_location;
-    _ = parent_index;
-    _ = errors;
-
     var tokenizer = Tokenizer.init(source, std.testing.allocator);
     var tokens = try tokenizer.tokenize();
     defer tokens.deinit(std.testing.allocator);
@@ -438,37 +423,35 @@ fn testParser(source: []const u8, expected_tokens_kinds: []const Node.NodeKind, 
     try parser.parseRoot();
 
     const slice = parser.nodes.slice();
-    _ = slice;
 
     const errors_slice = parser.errors.slice();
-    _ = errors_slice;
 
-    // var i: usize = 0;
-    // for (expected_tokens_kinds) |expected_token_kind| {
-    //     try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
+    var i: usize = 0;
+    for (expected_tokens_kinds) |expected_token_kind| {
+        try std.testing.expectEqual(expected_token_kind, slice.get(i).kind);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 
-    // i = 0;
-    // for (expected_location) |location| {
-    //     try std.testing.expectEqual(location.start, slice.get(i).start);
-    //     try std.testing.expectEqual(location.end, slice.get(i).end);
+    i = 0;
+    for (expected_location) |location| {
+        try std.testing.expectEqual(location.start, slice.get(i).start);
+        try std.testing.expectEqual(location.end, slice.get(i).end);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 
-    // i = 0;
-    // for (parent_index) |index| {
-    //     try std.testing.expectEqual(index, slice.get(i).parent_index);
+    i = 0;
+    for (parent_index) |index| {
+        try std.testing.expectEqual(index, slice.get(i).parent_index);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 
-    // i = 0;
-    // for (errors) |error_tag| {
-    //     try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
+    i = 0;
+    for (errors) |error_tag| {
+        try std.testing.expectEqual(error_tag, errors_slice.get(i).tag);
 
-    //     i += 1;
-    // }
+        i += 1;
+    }
 }
