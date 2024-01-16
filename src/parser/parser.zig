@@ -27,6 +27,11 @@ pub const Parser = struct {
         OutOfMemory,
     };
 
+    const State = enum {
+        start,
+        string_literal,
+    };
+
     pub fn init(allocator: std.mem.Allocator, tokens: []Token.Tag, loc: []Token.Location, source: []const u8, nodes: NodeList) Parser {
         return Parser{
             .tokens = tokens,
@@ -90,10 +95,8 @@ pub const Parser = struct {
     }
 
     fn parseFunctionArguments(self: *Parser, function_index: usize) ParserError!void {
-        const State = enum {
-            start,
-            string_literal,
-        };
+        // Were are on the left parenthesis and we go to the first argument
+        self.index += 1;
 
         var state: State = .start;
 
@@ -121,7 +124,9 @@ pub const Parser = struct {
                 },
                 .string_literal => {
                     switch (token) {
+                        .string_literal => {},
                         .space => {
+                            // Example of the use case : list(Example bold(Hello))
                             if (!self.expectNextToken(Token.Tag.string_literal)) {
                                 // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
 
@@ -133,7 +138,6 @@ pub const Parser = struct {
                                 });
                             }
                         },
-                        .string_literal => {},
                         .comma => {
                             if (self.expectPreviousToken(Token.Tag.string_literal)) {
                                 // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index : {d}\n", .{ start_index, self.loc[self.index].end, function_index });
@@ -146,11 +150,9 @@ pub const Parser = struct {
                                 });
                             }
 
-                            self.index += 1;
-
                             try self.parseFunctionArguments(function_index);
 
-                            break;
+                            return;
                         },
                         .right_parenthesis => {
                             // std.debug.print("Add : string_literal => start :{d} - end {d} - parent_index {d}\n", .{ start_index, self.loc[self.index].end - 1, function_index });
@@ -162,7 +164,7 @@ pub const Parser = struct {
                                 .end = self.loc[self.index].end - 1,
                             });
 
-                            break;
+                            return;
                         },
                         else => {
                             // For the recursive case : Example bold(bold(Hello))
@@ -191,8 +193,8 @@ pub const Parser = struct {
             return;
         }
 
-        // We skip the parenthesis
-        self.index += 2;
+        // We are the character just before the left parenthesis and we go to the parenthesis
+        self.index += 1;
 
         try self.parseFunctionArguments(self.nodes.len - 1);
 
@@ -225,6 +227,7 @@ test "Parser: bold" {
 
 test "Parser: missing right parenthesis" {
     const source = "bold(Hello";
+
     try testParser(source, &.{
         .root,
         .bold_function,
@@ -256,6 +259,27 @@ test "Parser: recursive bold function" {
         0,
         1,
         2,
+    }, &.{});
+
+    const source2 = "bold(bold(Hello) )";
+    try testParser(source2, &.{
+        .root,
+        .bold_function,
+        .bold_function,
+        .string_literal,
+        .string_literal,
+    }, &.{
+        .{ .start = 0, .end = 0 },
+        .{ .start = 0, .end = 3 },
+        .{ .start = 5, .end = 8 },
+        .{ .start = 10, .end = 14 },
+        .{ .start = 16, .end = 16 },
+    }, &.{
+        0,
+        0,
+        1,
+        2,
+        1,
     }, &.{});
 }
 
